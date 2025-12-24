@@ -605,6 +605,7 @@ async function handleFinalConfirm(from, msg, twiml) {
 
 // --- 8. ADMIN & ORDER LOGIC ---
 
+// --- UPDATED: Create Order (Triggered by Screenshot) ---
 async function createOrderInDB(from, user, twiml) {
   const orderId = generateId();
   const total = user.final_total;
@@ -627,26 +628,38 @@ async function createOrderInDB(from, user, twiml) {
   // Reset user state
   await db.ref(`users/${from}`).update({ step: 'new' });
 
-  // 1. Tell Customer "Order Placed"
+  // 1. Tell Customer "Order Placed" (This happens no matter what)
   twiml.message(`✅ *Order Received!*\n\nYour Order #${orderId} is worth ${formatCurrency(total)}.\n\nWe are verifying your payment now. You will be notified shortly.`);
 
-  // 2. Notify Admin (Proactive Message)
-  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  
-  let itemsList = "";
-  if (user.order_type === 'food') {
-    user.cart.forEach(c => itemsList += `- ${c.name} x${c.qty}\n`);
-  } else {
-    user.errand_items.forEach(i => itemsList += `- ${i.name}\n`);
+  // 2. Notify Admin (Wrapped in try/catch so errors don't crash the bot for the user)
+  try {
+    const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    
+    // Fix: Ensure ADMIN_PHONE has 'whatsapp:' prefix
+    let adminPhone = ADMIN_PHONE;
+    if (!adminPhone.startsWith('whatsapp:')) {
+      adminPhone = `whatsapp:${adminPhone}`;
+    }
+
+    let itemsList = "";
+    if (user.order_type === 'food') {
+      user.cart.forEach(c => itemsList += `- ${c.name} x${c.qty}\n`);
+    } else {
+      user.errand_items.forEach(i => itemsList += `- ${i.name}\n`);
+    }
+
+    const adminMsg = `💳 *NEW PAYMENT ALERT*\n\nOrder ID: #${orderId}\nCustomer: ${user.phone}\nTotal: ${formatCurrency(total)}\nItems:\n${itemsList}\n\n[Check WhatsApp for Screenshot]`;
+
+    await client.messages.create({
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: adminPhone,
+      body: adminMsg
+    });
+  } catch (err) {
+    // If admin notification fails, we just log it to console, 
+    // we don't want to show an error to the customer
+    console.error("Failed to send Admin notification:", err);
   }
-
-  const adminMsg = `💳 *NEW PAYMENT ALERT*\n\nOrder ID: #${orderId}\nCustomer: ${user.phone}\nTotal: ${formatCurrency(total)}\nItems:\n${itemsList}\n\n[Check WhatsApp for Screenshot]`;
-
-  await client.messages.create({
-    from: process.env.TWILIO_PHONE_NUMBER,
-    to: ADMIN_PHONE,
-    body: adminMsg
-  });
 }
 
 async function approveOrder(orderId) {
