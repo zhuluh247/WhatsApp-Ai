@@ -1,18 +1,3 @@
-
-
-This is a **great simplification**. It turns the bot into a true **"Connector"** and lets the humans (Admin & Rider) use WhatsApp to chat and arrange things privately.
-
-Here is the **full, simplified `index.js`**.
-
-### Changes made:
-1.  **Simplified Approve:** Admin just says "Approved". Bot tells customer "Confirmed" and broadcasts to riders.
-2.  **Simplified Acceptance:** Rider accepts -> Bot immediately tells Admin **Rider's Name & Phone** AND tells User **Rider's Phone**.
-3.  **Removed "Funds Sent" Step:** Admin and Rider chat privately on WhatsApp to arrange money.
-4.  **Delivery:** Rider just says "DELIVERED". Bot thanks the user.
-
-### `index.js`
-
-```javascript
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -157,7 +142,6 @@ app.post('/whatsapp', async (req, res) => {
         twiml.message(`Order #${orderId} Rejected.`);
         return res.type('text/xml').send(twiml.toString());
       }
-      // "FUNDS SENT" command removed as per new requirements
     }
 
     // --- D. RIDER COMMANDS ---
@@ -549,7 +533,7 @@ async function handleDeliveryLocation(from, text, twiml) {
     step: 'phone_number',
     delivery_location: text
   });
-  twiml.message("📞 Please share your Phone Number for rider.");
+  twiml.message("📞 Please share your Phone Number for the rider.");
 }
 
 async function handlePhoneNumber(from, text, twiml) {
@@ -595,7 +579,6 @@ async function handleFinalConfirm(from, msg, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
 
-  // Move to awaiting payment state
   await db.ref(`users/${from}`).update({
     step: 'awaiting_payment'
   });
@@ -737,7 +720,7 @@ async function updateOrderStatus(orderId, status, twiml, from) {
     await client.messages.create({
       from: process.env.TWILIO_PHONE_NUMBER,
       to: order.customer,
-      body: `✅ *Order Delivered!*\n\nOrder #${orderId} is complete.\n\nThank you for using ChowZone! 🤝`
+      body: `✅ *Order Delivered!*\n\nOrder #${orderId} is complete.\n\nThank you for using ChowZone! 🍽️`
     });
     
     twiml.message(`✅ Order #${orderId} marked as Delivered. Good job!`);
@@ -754,7 +737,7 @@ async function broadcastToRiders(orderId, order) {
   let msg = `🛵 NEW JOB #${orderId}\n`;
   msg += `Pickup: ${order.pickup_loc}\n`;
   msg += `Dropoff: ${order.delivery_loc}\n`;
-  msg += `Customer: ${order.customer_phone}\n`; // Added Customer Phone
+  msg += `Customer: ${order.customer_phone}\n`; 
   msg += `Fee: ${formatCurrency(DELIVERY_FEE)}\n`;
   msg += `Reply: ACCEPT ${orderId}`;
 
@@ -776,4 +759,3 @@ async function broadcastToRiders(orderId, order) {
 // --- 9. LISTEN ---
 app.get('/', (req, res) => res.send('ChowZone Bot is Active'));
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-```
