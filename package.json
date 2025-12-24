@@ -1,0 +1,20 @@
+{
+  "name": "chowzone-bot",
+  "version": "1.0.0",
+  "description": "ChowZone WhatsApp Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "firebase-admin": "^11.11.0",
+    "twilio": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
