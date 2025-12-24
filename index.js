@@ -1,3 +1,18 @@
+
+
+This is a **great simplification**. It turns the bot into a true **"Connector"** and lets the humans (Admin & Rider) use WhatsApp to chat and arrange things privately.
+
+Here is the **full, simplified `index.js`**.
+
+### Changes made:
+1.  **Simplified Approve:** Admin just says "Approved". Bot tells customer "Confirmed" and broadcasts to riders.
+2.  **Simplified Acceptance:** Rider accepts -> Bot immediately tells Admin **Rider's Name & Phone** AND tells User **Rider's Phone**.
+3.  **Removed "Funds Sent" Step:** Admin and Rider chat privately on WhatsApp to arrange money.
+4.  **Delivery:** Rider just says "DELIVERED". Bot thanks the user.
+
+### `index.js`
+
+```javascript
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -96,7 +111,6 @@ app.post('/whatsapp', async (req, res) => {
       const userSnap = await db.ref(`users/${from}`).once('value');
       const user = userSnap.val();
       
-      // If user is waiting to send payment proof
       if (user && user.step === 'awaiting_payment') {
         await createOrderInDB(from, user, twiml);
         return res.type('text/xml').send(twiml.toString());
@@ -143,12 +157,7 @@ app.post('/whatsapp', async (req, res) => {
         twiml.message(`Order #${orderId} Rejected.`);
         return res.type('text/xml').send(twiml.toString());
       }
-      if (msg.startsWith('funds sent ')) {
-        const orderId = msg.split(' ')[2];
-        await confirmFunds(orderId);
-        twiml.message(`Order #${orderId} marked as Funded.`);
-        return res.type('text/xml').send(twiml.toString());
-      }
+      // "FUNDS SENT" command removed as per new requirements
     }
 
     // --- D. RIDER COMMANDS ---
@@ -169,11 +178,6 @@ app.post('/whatsapp', async (req, res) => {
       if (msg.startsWith('accept ')) {
         const orderId = msg.split(' ')[1];
         await acceptOrder(from, orderId, twiml);
-        return res.type('text/xml').send(twiml.toString());
-      }
-      if (msg.startsWith('picked up')) {
-        // Assumes "PICKED UP 123"
-        await updateOrderStatus(msg.split(' ')[2], 'picked_up', twiml, from);
         return res.type('text/xml').send(twiml.toString());
       }
       if (msg.startsWith('delivered')) {
@@ -221,12 +225,11 @@ app.post('/whatsapp', async (req, res) => {
       case 'protein_qty':
         await handleProteinQty(from, parseInt(msg), twiml);
         break;
-      // FIXED: Handle the choice to add more food or checkout
       case 'add_more_or_checkout':
         if (msg === '1') {
-           await showCategories(from, twiml); // Go back to food menu
+           await showCategories(from, twiml); 
         } else if (msg === '2') {
-           await handleDeliveryLocation(from, "", twiml); // Proceed to details
+           await handleDeliveryLocation(from, "", twiml); 
         } else {
            twiml.message("Reply 1 or 2.");
         }
@@ -362,7 +365,7 @@ async function handleSizeSelect(from, choice, twiml) {
 async function handleQuantitySelect(from, qty, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
-  const item = user.selected_item;
+  const item = userSnap.val().selected_item;
   const price = user.selected_item_price || item.reg;
   const size = user.selected_size || (item.reg === item.ext ? 'Regular' : 'Regular');
 
@@ -384,7 +387,6 @@ async function handleQuantitySelect(from, qty, twiml) {
     });
     twiml.message(`✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`);
   } else {
-    // It was a standalone protein order, show cart summary
     await showCartSummary(from, cart, twiml);
   }
 }
@@ -547,7 +549,7 @@ async function handleDeliveryLocation(from, text, twiml) {
     step: 'phone_number',
     delivery_location: text
   });
-  twiml.message("📞 Please share your Phone Number for the rider.");
+  twiml.message("📞 Please share your Phone Number for rider.");
 }
 
 async function handlePhoneNumber(from, text, twiml) {
@@ -577,7 +579,6 @@ async function handlePhoneNumber(from, text, twiml) {
     total += SHOPPING_FEE;
   }
 
-  // FIXED: Add Delivery Fee
   total += DELIVERY_FEE;
   summary += `\nDelivery Fee: ${formatCurrency(DELIVERY_FEE)}`;
   summary += `\n━━━━━━━━━━━\n💰 *TOTAL: ${formatCurrency(total)}*`;
@@ -599,13 +600,11 @@ async function handleFinalConfirm(from, msg, twiml) {
     step: 'awaiting_payment'
   });
 
-  // FIXED: Correct Payment Info
   twiml.message(`💳 *Payment Details*\n\nPlease pay ${formatCurrency(user.final_total)} to:\n\n🏦 *Bank:* Monie Point\n👤 *Name:* ChowZone Dev\n🔢 *Acct:* 70437763589\n\n📸 *Send a screenshot of the receipt here to complete your order.*`);
 }
 
 // --- 8. ADMIN & ORDER LOGIC ---
 
-// --- UPDATED: Create Order (Triggered by Screenshot) ---
 async function createOrderInDB(from, user, twiml) {
   const orderId = generateId();
   const total = user.final_total;
@@ -624,18 +623,14 @@ async function createOrderInDB(from, user, twiml) {
   };
 
   await db.ref(`orders/${orderId}`).set(orderData);
-
-  // Reset user state
   await db.ref(`users/${from}`).update({ step: 'new' });
 
-  // 1. Tell Customer "Order Placed" (This happens no matter what)
   twiml.message(`✅ *Order Received!*\n\nYour Order #${orderId} is worth ${formatCurrency(total)}.\n\nWe are verifying your payment now. You will be notified shortly.`);
 
-  // 2. Notify Admin (Wrapped in try/catch so errors don't crash the bot for the user)
+  // Notify Admin (Wrapped in try/catch)
   try {
     const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
     
-    // Fix: Ensure ADMIN_PHONE has 'whatsapp:' prefix
     let adminPhone = ADMIN_PHONE;
     if (!adminPhone.startsWith('whatsapp:')) {
       adminPhone = `whatsapp:${adminPhone}`;
@@ -656,8 +651,6 @@ async function createOrderInDB(from, user, twiml) {
       body: adminMsg
     });
   } catch (err) {
-    // If admin notification fails, we just log it to console, 
-    // we don't want to show an error to the customer
     console.error("Failed to send Admin notification:", err);
   }
 }
@@ -669,15 +662,16 @@ async function approveOrder(orderId) {
 
   await db.ref(`orders/${orderId}/status`).set('seeking_rider');
   
-  // 1. Notify Customer
   const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  
+  // Notify Customer: Simplified
   await client.messages.create({
     from: process.env.TWILIO_PHONE_NUMBER,
     to: order.customer,
-    body: `✅ *Payment Approved!*\n\nOrder #${orderId} is confirmed. We are looking for a rider now.`
+    body: `✅ *Payment Verified*\n\nYour Order #${orderId} has been placed! We are assigning a rider now.`
   });
 
-  // 2. Broadcast to Riders
+  // Broadcast to Riders
   broadcastToRiders(orderId, order);
 }
 
@@ -696,31 +690,39 @@ async function rejectOrder(orderId) {
   });
 }
 
-async function confirmFunds(orderId) {
-  await db.ref(`orders/${orderId}/status`).set('funded');
-  const snap = await db.ref(`orders/${orderId}`).once('value');
-  const order = snap.val();
-  if (order.rider_phone) {
-    const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    client.messages.create({
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: order.rider_phone,
-      body: `💰 Admin sent funds for Order #${orderId}. Proceed to pickup.`
-    });
-  }
-}
-
 async function acceptOrder(riderPhone, orderId, twiml) {
   const snap = await db.ref(`orders/${orderId}`).once('value');
   const order = snap.val();
   
   if (order.status !== 'seeking_rider') return twiml.message("Job already taken or closed.");
 
+  // Get Rider Name
+  const riderSnap = await db.ref(`riders/${riderPhone}`).once('value');
+  const rider = riderSnap.val();
+
   await db.ref(`orders/${orderId}`).update({
     status: 'rider_accepted',
     rider_phone: riderPhone
   });
-  twiml.message(`✅ Tentatively accepted Order #${orderId}. Wait for Admin confirmation.`);
+
+  twiml.message(`✅ You have accepted Order #${orderId}. Connect with Admin directly.`);
+
+  // Notify Admin (Provide Rider Info)
+  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  const adminMsg = `🛵 *RIDER ACCEPTED*\n\nOrder #${orderId}\nRider: ${rider.name}\nPhone: ${riderPhone}\n\nPlease chat with rider to arrange details.`;
+
+  await client.messages.create({
+    from: process.env.TWILIO_PHONE_NUMBER,
+    to: ADMIN_PHONE,
+    body: adminMsg
+  });
+
+  // Notify Customer (Provide Rider Phone)
+  await client.messages.create({
+    from: process.env.TWILIO_PHONE_NUMBER,
+    to: order.customer,
+    body: `🛵 *Rider Assigned*\n\nOrder #${orderId}\nRider Name: ${rider.name}\nRider Phone: ${riderPhone}\n\nExpect delivery shortly.`
+  });
 }
 
 async function updateOrderStatus(orderId, status, twiml, from) {
@@ -730,23 +732,16 @@ async function updateOrderStatus(orderId, status, twiml, from) {
 
   await db.ref(`orders/${orderId}/status`).set(status);
   
-  if (status === 'picked_up') {
+  if (status === 'delivered') {
     const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    client.messages.create({
+    await client.messages.create({
       from: process.env.TWILIO_PHONE_NUMBER,
       to: order.customer,
-      body: `🛵 Rider has picked up your Order #${orderId}!`
+      body: `✅ *Order Delivered!*\n\nOrder #${orderId} is complete.\n\nThank you for using ChowZone! 🤝`
     });
-  } else if (status === 'delivered') {
-    const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    client.messages.create({
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: order.customer,
-      body: `✅ Order #${orderId} Delivered! Please rate your experience 1-5.`
-    });
+    
+    twiml.message(`✅ Order #${orderId} marked as Delivered. Good job!`);
   }
-  
-  twiml.message(`Order #${orderId} updated to ${status.toUpperCase()}.`);
 }
 
 async function broadcastToRiders(orderId, order) {
@@ -755,9 +750,11 @@ async function broadcastToRiders(orderId, order) {
   
   const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   
+  // Include Customer Phone in broadcast so rider can call them
   let msg = `🛵 NEW JOB #${orderId}\n`;
   msg += `Pickup: ${order.pickup_loc}\n`;
   msg += `Dropoff: ${order.delivery_loc}\n`;
+  msg += `Customer: ${order.customer_phone}\n`; // Added Customer Phone
   msg += `Fee: ${formatCurrency(DELIVERY_FEE)}\n`;
   msg += `Reply: ACCEPT ${orderId}`;
 
@@ -779,3 +776,4 @@ async function broadcastToRiders(orderId, order) {
 // --- 9. LISTEN ---
 app.get('/', (req, res) => res.send('ChowZone Bot is Active'));
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+```
