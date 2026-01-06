@@ -182,44 +182,64 @@ app.post('/whatsapp', async (req, res) => {
         await handleMainMenu(from, msg, twiml);
         break;
       case 'vendor_select':
-        if (msg === '1') await showCategories(from, twiml);
+        if (msg === '1' || msg === 'order food') await showCategories(from, twiml);
         else twiml.message("Invalid option.");
         break;
       case 'category_select':
-        await handleCategorySelect(from, parseInt(msg), twiml);
+        if (msg === 'rice meals' || msg === '1') { await handleCategorySelect(from, 1, twiml); }
+        else if (msg === 'swallow & solids' || msg === '2') { await handleCategorySelect(from, 2, twiml); }
+        else if (msg === 'proteins / add-ons' || msg === '3') { await handleCategorySelect(from, 3, twiml); }
+        else twiml.message("Invalid category.");
         break;
       case 'item_select':
         await handleItemSelect(from, parseInt(msg), twiml);
         break;
       case 'size_select':
-        await handleSizeSelect(from, msg, twiml);
+        if (msg === 'regular' || msg === '1') await handleSizeSelect(from, 1, twiml);
+        else if (msg === 'extra' || msg === '2') await handleSizeSelect(from, 2, twiml);
+        else twiml.message("Invalid option.");
         break;
       case 'quantity_select':
         await handleQuantitySelect(from, parseInt(msg), twiml);
         break;
       case 'protein_loop':
-        await handleProteinLoop(from, msg, twiml);
+        if (msg === 'yes' || msg === '1') {
+           const userSnap = await db.ref(`users/${from}`).once('value');
+           await handleProteinLoop(from, msg, twiml);
+        } else if (msg === 'no' || msg === '2') {
+           const userSnap = await db.ref(`users/${from}`).once('value');
+           await showCartSummary(from, userSnap.val().cart, twiml);
+        } else {
+           twiml.message("Reply 1 or 2.");
+        }
         break;
       case 'protein_select':
         await handleProteinSelect(from, parseInt(msg), twiml);
         break;
       case 'protein_size':
-        await handleProteinSize(from, msg, twiml);
+        if (msg === 'regular' || msg === '1') await handleProteinSize(from, 1, twiml);
+        else if (msg === 'extra' || msg === '2') await handleProteinSize(from, 2, twiml);
+        else twiml.message("Invalid option.");
         break;
       case 'protein_qty':
         await handleProteinQty(from, parseInt(msg), twiml);
         break;
       case 'add_more_or_checkout':
-        if (msg === '1') {
+        if (msg === 'yes' || msg === 'add food' || msg === '1') {
            await showCategories(from, twiml); 
-        } else if (msg === '2') {
+        } else if (msg === 'no' || msg === 'proceed to delivery' || msg === '2') {
+           const userSnap = await db.ref(`users/${from}`).once('value');
            await handleDeliveryLocation(from, "", twiml); 
         } else {
            twiml.message("Reply 1 or 2.");
         }
         break;
       case 'errand_type':
-        await handleErrandType(from, parseInt(msg), twiml);
+        if (msg === 'market shopping' || msg === '1') { await handleErrandType(from, 1, twiml); }
+        else if (msg === 'pick up item' || msg === '2') { await handleErrandType(from, 2, twiml); }
+        else if (msg === 'pharmacy / supermarket' || msg === '3') { await handleErrandType(from, 3, twiml); }
+        else if (msg === 'campus task' || msg === '4') { await handleErrandType(from, 4, twiml); }
+        else twiml.message("Invalid option.");
         break;
       case 'errand_details':
         await handleErrandDetails(from, originalMsg, twiml);
@@ -234,7 +254,8 @@ app.post('/whatsapp', async (req, res) => {
         await handlePhoneNumber(from, originalMsg, twiml);
         break;
       case 'confirm_order':
-        await handleFinalConfirm(from, msg, twiml);
+        if (msg === 'confirm') await handleFinalConfirm(from, msg, twiml);
+        else twiml.message("Please type CONFIRM to proceed.");
         break;
       default:
         twiml.message("I didn't understand that. Reply 'Menu'.");
@@ -258,23 +279,38 @@ async function resetUser(from, twiml) {
     order_type: null,
     errand_data: {}
   });
-  const welcomeMsg = `🍽️ *Welcome to ChowZone!*\n\nHow can we help you today?\n\n1. Order Food\n2. Errands (Market/Pharmacy/Pickup)\n\nReply with number 1 or 2.`;
-  twiml.message(welcomeMsg);
+  const welcomeMsg = new twilio.twiml.MessagingResponse();
+  const list = welcomeMsg.message("How can we help you today?");
+  
+  list.addContent(twilio.twiml.ContentOption.create({ body: "🍽️ Order Food", contentType: "text/plain" }));
+  list.addContent(twilio.twiml.ContentOption.create({ body: "🏃 Errands", contentType: "text/plain" }));
+  
+  twiml.message(list);
+  res.type('text/xml').send(twiml.toString());
 }
 
 async function handleMainMenu(from, msg, twiml) {
-  if (msg === '1') {
+  if (msg === '1' || msg === 'order food') {
     await db.ref(`users/${from}`).update({
       step: 'vendor_select',
       order_type: 'food'
     });
-    twiml.message(`🏪 *Select Vendor*\n\n1. ${VENDOR_NAME}\n\nReply 1.`);
-  } else if (msg === '2') {
+    const menuMsg = new twilio.twiml.MessagingResponse();
+    const list = menuMsg.message(`🏪 *Select Vendor*\n\n`);
+    list.addContent(twilio.twiml.ContentOption.create({ body: `1. ${VENDOR_NAME}`, contentType: "text/plain" }));
+    twiml.message(list);
+  } else if (msg === '2' || msg === 'errands') {
     await db.ref(`users/${from}`).update({
       step: 'errand_type',
       order_type: 'errand'
     });
-    twiml.message(`🏃 *Select Errand Type*\n\n1. 🛒 Market Shopping\n2. 📦 Pick Up Item\n3. 💊 Pharmacy / Supermarket\n4. 📝 Campus Task\n\nReply with number.`);
+    const menuMsg = new twilio.twiml.MessagingResponse();
+    const list = menuMsg.message(`🏃 *Select Errand Type*\n\n`);
+    list.addContent(twilio.twiml.ContentOption.create({ body: "1. 🛒 Market Shopping", contentType: "text/plain" }));
+    list.addContent(twilio.twiml.ContentOption.create({ body: "2. 📦 Pick Up Item", contentType: "text/plain" }));
+    list.addContent(twilio.twiml.ContentOption.create({ body: "3. 💊 Pharmacy / Supermarket", contentType: "text/plain" }));
+    list.addContent(twilio.twiml.ContentOption.create({ body: "4. 📝 Campus Task", contentType: "text/plain" }));
+    twiml.message(list);
   } else {
     twiml.message("Invalid option.");
   }
@@ -282,9 +318,14 @@ async function handleMainMenu(from, msg, twiml) {
 
 async function showCategories(from, twiml) {
   await db.ref(`users/${from}/step`).set('category_select');
-  let msg = `🍽️ *${VENDOR_NAME} Categories*\n\n`;
-  msg += `1. 🍚 Rice Meals\n2. 🥘 Swallow & Solids\n3. 🍗 Proteins / Add-ons\n\nReply number.`;
-  twiml.message(msg);
+  
+  const menuMsg = new twilio.twiml.MessagingResponse();
+  const list = menuMsg.message(`🍽️ *${VENDOR_NAME} Categories*\n\n`);
+  list.addContent(twilio.twiml.ContentOption.create({ body: "1. 🍚 Rice Meals", contentType: "text/plain" }));
+  list.addContent(twilio.twiml.ContentOption.create({ body: "2. 🥘 Swallow & Solids", contentType: "text/plain" }));
+  list.addContent(twilio.twiml.ContentOption.create({ body: "3. 🍗 Proteins / Add-ons", contentType: "text/plain" }));
+  
+  twiml.message(list);
 }
 
 async function handleCategorySelect(from, choice, twiml) {
@@ -300,13 +341,14 @@ async function handleCategorySelect(from, choice, twiml) {
     current_category: categoryKey
   });
 
-  let msg = `*${categoryKey.replace('_', ' ')}*\n\n`;
+  let txt = `*${categoryKey.replace('_', ' ')}*\n\n`;
   MENU_CATEGORIES[categoryKey].forEach(item => {
     const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`;
-    msg += `${item.id}. ${item.name} - ${priceTxt}\n`;
+    txt += `${item.id}. ${item.name} - ${priceTxt}\n`;
   });
-  msg += `\nReply item number.`;
-  twiml.message(msg);
+  txt += `\nReply item number.`;
+  
+  twiml.message(txt);
 }
 
 async function handleItemSelect(from, id, twiml) {
@@ -326,8 +368,11 @@ async function handleItemSelect(from, id, twiml) {
     await db.ref(`users/${from}/step`).set('quantity_select');
     twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many?`);
   } else {
-    let msg = `*${item.name}*\n\nSelect Portion:\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`;
-    twiml.message(msg);
+    const menuMsg = new twilio.twiml.MessagingResponse();
+    const list = menuMsg.message(`*${item.name}*\n\nSelect Portion:\n`);
+    list.addContent(twilio.twiml.ContentOption.create({ body: `1. Regular (${formatCurrency(item.reg)})`, contentType: "text/plain" }));
+    list.addContent(twilio.twiml.ContentOption.create({ body: `2. Extra (${formatCurrency(item.ext)})`, contentType: "text/plain" }));
+    twiml.message(list);
   }
 }
 
@@ -369,14 +414,19 @@ async function handleQuantitySelect(from, qty, twiml) {
       step: 'protein_loop',
       cart: cart
     });
-    twiml.message(`✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`);
+    
+    const menuMsg = new twilio.twiml.MessagingResponse();
+    const list = menuMsg.message(`✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?\n`);
+    list.addContent(twilio.twiml.ContentOption.create({ body: "1. Yes", contentType: "text/plain" }));
+    list.addContent(twilio.twiml.ContentOption.create({ body: "2. No", contentType: "text/plain" }));
+    twiml.message(list);
   } else {
     await showCartSummary(from, cart, twiml);
   }
 }
 
 async function handleProteinLoop(from, msg, twiml) {
-  if (msg === '1') {
+  if (msg === '1' || msg === 'yes') {
     const cat = MENU_CATEGORIES['PROTEINS'];
     let txt = `🍗 *Proteins & Sides*\n\n`;
     cat.forEach(item => {
@@ -387,7 +437,7 @@ async function handleProteinLoop(from, msg, twiml) {
     
     await db.ref(`users/${from}/step`).set('protein_select');
     twiml.message(txt);
-  } else if (msg === '2') {
+  } else if (msg === '2' || msg === 'no') {
     const userSnap = await db.ref(`users/${from}`).once('value');
     await showCartSummary(from, userSnap.val().cart, twiml);
   } else {
@@ -409,7 +459,11 @@ async function handleProteinSelect(from, id, twiml) {
     await db.ref(`users/${from}/step`).set('protein_qty');
     twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many pieces?`);
   } else {
-    twiml.message(`*${item.name}*\n\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`);
+    const menuMsg = new twilio.twiml.MessagingResponse();
+    const list = menuMsg.message(`*${item.name}*\n\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`);
+    list.addContent(twilio.twiml.ContentOption.create({ body: "1. Regular", contentType: "text/plain" }));
+    list.addContent(twilio.twiml.ContentOption.create({ body: "2. Extra", contentType: "text/plain" }));
+    twiml.message(list);
   }
 }
 
@@ -443,7 +497,12 @@ async function handleProteinQty(from, qty, twiml) {
   cart.push(newItem);
 
   await db.ref(`users/${from}`).update({ cart: cart, step: 'protein_loop' });
-  twiml.message(`✅ Added ${qty}x ${item.name}.\n\nAdd another protein?\n1. Yes\n2. No (Checkout)`);
+  
+  const menuMsg = new twilio.twiml.MessagingResponse();
+  const list = menuMsg.message(`✅ Added ${qty}x ${item.name}.\n\nAdd another protein?\n`);
+  list.addContent(twilio.twiml.ContentOption.create({ body: "1. Yes", contentType: "text/plain" }));
+  list.addContent(twilio.twiml.ContentOption.create({ body: "2. No (Checkout)", contentType: "text/plain" }));
+  twiml.message(list);
 }
 
 async function showCartSummary(from, cart, twiml) {
@@ -455,13 +514,17 @@ async function showCartSummary(from, cart, twiml) {
     txt += `${c.name} (${c.size}) x${c.qty} = ${formatCurrency(t)}\n`;
   });
   txt += `\n💰 Subtotal: ${formatCurrency(sub)}\n\n`;
-  txt += `Do you want to add another meal?\n1. Yes (Add Food)\n2. No (Proceed to Delivery)`;
+  
+  const menuMsg = new twilio.twiml.MessagingResponse();
+  const list = menuMsg.message(`Do you want to add another meal?\n`);
+  list.addContent(twilio.twiml.ContentOption.create({ body: "1. Yes (Add Food)", contentType: "text/plain" }));
+  list.addContent(twilio.twiml.ContentOption.create({ body: "2. No (Proceed to Delivery)", contentType: "text/plain" }));
+  twiml.message(list);
 
   await db.ref(`users/${from}`).update({
     step: 'add_more_or_checkout',
     cart_subtotal: sub
   });
-  twiml.message(txt);
 }
 
 // --- ERRAND HANDLERS ---
@@ -569,8 +632,11 @@ async function handlePhoneNumber(from, text, twiml) {
 
   await db.ref(`users/${from}`).update({ final_total: total });
 
-  summary += `\n\nReply "CONFIRM" to proceed to payment.`;
-  twiml.message(summary);
+  // Use a Button for Confirm
+  const menuMsg = new twilio.twiml.MessagingResponse();
+  const list = menuMsg.message(`Reply "CONFIRM" to proceed to payment.\n`);
+  list.addContent(twilio.twiml.ContentOption.create({ body: "CONFIRM", contentType: "text/plain" }));
+  twiml.message(list);
 }
 
 async function handleFinalConfirm(from, msg, twiml) {
