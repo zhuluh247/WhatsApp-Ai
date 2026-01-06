@@ -280,8 +280,7 @@ async function resetUser(from, twiml) {
     errand_data: {}
   });
   const welcomeMsg = new twilio.twiml.MessagingResponse();
-  const list = welcomeMsg.message("How can we help you today?");
-  
+  const list = welcomeMsg.message("How can we help you today?");  
   list.addContent(twilio.twiml.ContentOption.create({ body: "🍽️ Order Food", contentType: "text/plain" }));
   list.addContent(twilio.twiml.ContentOption.create({ body: "🏃 Errands", contentType: "text/plain" }));
   
@@ -347,7 +346,6 @@ async function handleCategorySelect(from, choice, twiml) {
     txt += `${item.id}. ${item.name} - ${priceTxt}\n`;
   });
   txt += `\nReply item number.`;
-  
   twiml.message(txt);
 }
 
@@ -414,7 +412,6 @@ async function handleQuantitySelect(from, qty, twiml) {
       step: 'protein_loop',
       cart: cart
     });
-    
     const menuMsg = new twilio.twiml.MessagingResponse();
     const list = menuMsg.message(`✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?\n`);
     list.addContent(twilio.twiml.ContentOption.create({ body: "1. Yes", contentType: "text/plain" }));
@@ -628,7 +625,7 @@ async function handlePhoneNumber(from, text, twiml) {
 
   total += DELIVERY_FEE;
   summary += `\nDelivery Fee: ${formatCurrency(DELIVERY_FEE)}`;
-  summary += `\n━━━━━━━━━━━\n💰 *TOTAL: ${formatCurrency(total)}*`;
+  summary += `\n━━━━━━━━━\n💰 *TOTAL: ${formatCurrency(total)}*`;
 
   await db.ref(`users/${from}`).update({ final_total: total });
 
