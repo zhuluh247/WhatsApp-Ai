@@ -35,6 +35,9 @@ const RIDER_REG_CODE = process.env.RIDER_REG_CODE;
 const DELIVERY_FEE = parseInt(process.env.DELIVERY_FEE) || 500;
 const SHOPPING_FEE = parseInt(process.env.SHOPPING_FEE) || 500;
 
+// Initialize Twilio Client ONCE for sending messages
+const client = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
 // --- 4. MENU DATA (Bissy Joy Eatery) ---
 const VENDOR_NAME = "Bissy Joy Eatery";
 const MENU_CATEGORIES = {
@@ -79,39 +82,69 @@ function formatCurrency(amount) {
   return `₦${amount.toLocaleString()}`;
 }
 
-// --- 6. PURE XML STRING GENERATOR (The Fix) ---
-// This creates a perfect XML string, bypassing the broken library.
-function createTwiml(body, actionXml = "") {
-  const safeBody = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return `<Response><Message><Body>${safeBody}</Body>${actionXml}</Message></Response>`;
+// --- 6. API SENDING HELPERS (The "Certain" Method) ---
+// This sends a message via the API, bypassing XML/TwiML errors completely
+async function sendButtons(to, bodyText, buttons) {
+  try {
+    await client.messages.create({
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: to,
+      body: bodyText,
+      action: {
+        type: 'buttons',
+        buttons: buttons.map(b => ({
+          type: 'reply',
+          id: b.id.toString(),
+          title: b.title
+        }))
+      }
+    });
+  } catch (e) {
+    console.error("API Send Error:", e);
+  }
 }
 
-function getButtonsXml(buttons) {
-  let xml = `<Action type="buttons">`;
-  buttons.forEach(btn => {
-    const safeTitle = btn.title.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-    xml += `<Button type="reply" id="${btn.id}">${safeTitle}</Button>`;
-  });
-  xml += `</Action>`;
-  return xml;
+async function sendList(to, bodyText, buttonLabel, items) {
+  try {
+    await client.messages.create({
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: to,
+      body: bodyText,
+      action: {
+        type: 'list',
+        list: {
+          button: buttonLabel,
+          sections: [{
+            title: "Select Option",
+            rows: items.map(i => ({
+              id: i.id.toString(),
+              title: i.title,
+              description: i.description || ''
+            }))
+          }]
+        }
+      }
+    });
+  } catch (e) {
+    console.error("API Send Error:", e);
+  }
 }
 
-function getListXml(buttonLabel, items) {
-  const safeLabel = buttonLabel.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  let xml = `<Action type="list"><List button="${safeLabel}"><Section title="Select Option">`;
-  
-  items.forEach(item => {
-    const safeTitle = item.title.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-    const safeDesc = item.description ? item.description.replace(/&/g, '&amp;').replace(/</g, '&lt;') : '';
-    xml += `<Row id="${item.id}"><Title>${safeTitle}</Title><Description>${safeDesc}</Description></Row>`;
-  });
-  
-  xml += `</Section></List></Action>`;
-  return xml;
+async function sendText(to, bodyText) {
+  try {
+    await client.messages.create({
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: to,
+      body: bodyText
+    });
+  } catch (e) {
+    console.error("API Send Error:", e);
+  }
 }
 
 // --- 7. MAIN WEBHOOK ROUTE ---
 app.post('/whatsapp', async (req, res) => {
+  const twiml = new twilio.twiml.MessagingResponse(); // Fallback for empty response
   const from = req.body.From;
   const body = (req.body.Body || '').trim();
   const msg = body.toLowerCase(); 
@@ -120,21 +153,19 @@ app.post('/whatsapp', async (req, res) => {
 
   console.log(`[${new Date().toISOString()}] From: ${from}, Msg: ${body}, Media: ${numMedia}`);
 
-  // Standard Twiml for fallback text messages
-  const fallbackTwiml = new twilio.twiml.MessagingResponse();
-
   try {
-    // --- A. MEDIA HANDLING ---
+    // --- A. MEDIA HANDLING (Payment Screenshots) ---
     if (numMedia > 0) {
       const userSnap = await db.ref(`users/${from}`).once('value');
       const user = userSnap.val();
       
       if (user && user.step === 'awaiting_payment') {
-        await createOrderInDB(from, user, fallbackTwiml);
-        return res.type('text/xml').send(fallbackTwiml.toString());
+        await createOrderInDB(from, user);
+        // We sent the notification inside the function, just return 200
+        return res.send(''); 
       } else {
-        fallbackTwiml.message("Please complete the text steps first. Reply 'Menu' to restart.");
-        return res.type('text/xml').send(fallbackTwiml.toString());
+        await sendText(from, "Please complete the text steps first. Reply 'Menu' to restart.");
+        return res.send('');
       }
     }
 
@@ -145,11 +176,11 @@ app.post('/whatsapp', async (req, res) => {
       const riderName = parts.slice(3).join(' ') || "Rider";
       if (code === RIDER_REG_CODE) {
         await db.ref(`riders/${from}`).set({ name: riderName, status: 'inactive', phone: from, joined_at: new Date().toISOString() });
-        fallbackTwiml.message(`✅ Registration Successful!\n\nWelcome ${riderName}. Text "ON DUTY" to start.`);
+        await sendText(from, `✅ Registration Successful!\n\nWelcome ${riderName}. Text "ON DUTY" to start.`);
       } else {
-        fallbackTwiml.message('❌ Invalid Registration Code.');
+        await sendText(from, '❌ Invalid Registration Code.');
       }
-      return res.type('text/xml').send(fallbackTwiml.toString());
+      return res.send('');
     }
 
     const userSnap = await db.ref(`users/${from}`).once('value');
@@ -160,14 +191,14 @@ app.post('/whatsapp', async (req, res) => {
       if (msg.startsWith('approve ')) {
         const orderId = msg.split(' ')[1];
         await approveOrder(orderId);
-        fallbackTwiml.message(`Order #${orderId} Approved.`);
-        return res.type('text/xml').send(fallbackTwiml.toString());
+        await sendText(from, `Order #${orderId} Approved.`);
+        return res.send('');
       }
       if (msg.startsWith('reject ')) {
         const orderId = msg.split(' ')[1];
         await rejectOrder(orderId);
-        fallbackTwiml.message(`Order #${orderId} Rejected.`);
-        return res.type('text/xml').send(fallbackTwiml.toString());
+        await sendText(from, `Order #${orderId} Rejected.`);
+        return res.send('');
       }
     }
 
@@ -178,108 +209,104 @@ app.post('/whatsapp', async (req, res) => {
     if (rider) {
       if (msg === 'on duty') {
         await db.ref(`riders/${from}/status`).set('on_duty');
-        fallbackTwiml.message('✅ You are ON DUTY.');
-        return res.type('text/xml').send(fallbackTwiml.toString());
+        await sendText(from, '✅ You are ON DUTY.');
+        return res.send('');
       }
       if (msg === 'off duty') {
         await db.ref(`riders/${from}/status`).set('inactive');
-        fallbackTwiml.message('⚠️ You are OFF DUTY.');
-        return res.type('text/xml').send(fallbackTwiml.toString());
+        await sendText(from, '⚠️ You are OFF DUTY.');
+        return res.send('');
       }
       if (msg.startsWith('accept ')) {
         const orderId = msg.split(' ')[1];
-        await acceptOrder(from, orderId, fallbackTwiml);
-        return res.type('text/xml').send(fallbackTwiml.toString());
+        await acceptOrder(from, orderId);
+        await sendText(from, `✅ You have accepted Order #${orderId}. Connect with Admin directly.`);
+        return res.send('');
       }
       if (msg.startsWith('delivered')) {
-        await updateOrderStatus(msg.split(' ')[1], 'delivered', fallbackTwiml, from);
-        return res.type('text/xml').send(fallbackTwiml.toString());
+        await updateOrderStatus(msg.split(' ')[1], 'delivered', from);
+        await sendText(from, `✅ Order #${msg.split(' ')[1]} marked as Delivered. Good job!`);
+        return res.send('');
       }
     }
 
     // --- E. CUSTOMER FLOW STATE MACHINE ---
     if (msg === 'hi' || msg === 'menu' || msg === '0') {
-      const xml = await resetUser(from);
-      return res.type('text/xml').send(xml);
+      await resetUser(from);
+      return res.send('');
     }
-
-    let xmlResponse = null;
 
     switch (user.step) {
       case 'new':
       case 'main_menu':
-        xmlResponse = await handleMainMenu(from, msg);
+        await handleMainMenu(from, msg);
         break;
       case 'vendor_select':
-        if (msg === '1') xmlResponse = await showCategories(from);
-        else xmlResponse = createTwiml("Invalid option.");
+        if (msg === '1') await showCategories(from);
+        else await sendText(from, "Invalid option.");
         break;
       case 'category_select':
-        xmlResponse = await handleCategorySelect(from, parseInt(msg));
+        await handleCategorySelect(from, parseInt(msg));
         break;
       case 'item_select':
-        xmlResponse = await handleItemSelect(from, parseInt(msg));
+        await handleItemSelect(from, parseInt(msg));
         break;
       case 'size_select':
-        xmlResponse = await handleSizeSelect(from, msg);
+        await handleSizeSelect(from, msg);
         break;
       case 'quantity_select':
-        xmlResponse = await handleQuantitySelect(from, parseInt(msg));
+        await handleQuantitySelect(from, parseInt(msg));
         break;
       case 'protein_loop':
-        xmlResponse = await handleProteinLoop(from, msg);
+        await handleProteinLoop(from, msg);
         break;
       case 'protein_select':
-        xmlResponse = await handleProteinSelect(from, parseInt(msg));
+        await handleProteinSelect(from, parseInt(msg));
         break;
       case 'protein_size':
-        xmlResponse = await handleProteinSize(from, msg);
+        await handleProteinSize(from, msg);
         break;
       case 'protein_qty':
-        xmlResponse = await handleProteinQty(from, parseInt(msg));
+        await handleProteinQty(from, parseInt(msg));
         break;
       case 'add_more_or_checkout':
-        if (msg === '1') xmlResponse = await showCategories(from); 
-        else if (msg === '2') xmlResponse = await handleDeliveryLocation(from, ""); 
-        else xmlResponse = createTwiml("Invalid selection.");
+        if (msg === '1') await showCategories(from); 
+        else if (msg === '2') await handleDeliveryLocation(from, ""); 
+        else await sendText(from, "Invalid selection.");
         break;
       case 'errand_type':
-        xmlResponse = await handleErrandType(from, parseInt(msg));
+        await handleErrandType(from, parseInt(msg));
         break;
       case 'errand_details':
-        xmlResponse = await handleErrandDetails(from, originalMsg);
+        await handleErrandDetails(from, originalMsg);
         break;
       case 'errand_location':
-        xmlResponse = await handleErrandLocation(from, originalMsg);
+        await handleErrandLocation(from, originalMsg);
         break;
       case 'delivery_location':
-        xmlResponse = await handleDeliveryLocation(from, originalMsg);
+        await handleDeliveryLocation(from, originalMsg);
         break;
       case 'phone_number':
-        xmlResponse = await handlePhoneNumber(from, originalMsg);
+        await handlePhoneNumber(from, originalMsg);
         break;
       case 'confirm_order':
-        xmlResponse = await handleFinalConfirm(from, msg);
+        await handleFinalConfirm(from, msg);
         break;
       default:
-        xmlResponse = createTwiml("I didn't understand that. Reply 'Menu'.");
+        await sendText(from, "I didn't understand that. Reply 'Menu'.");
     }
 
-    if (xmlResponse) {
-      return res.type('text/xml').send(xmlResponse);
-    } else {
-      // Fallback for safety
-      return res.type('text/xml').send(fallbackTwiml.toString());
-    }
+    res.send(''); // Return 200 OK immediately, message was sent via API
 
   } catch (error) {
     console.error("Error:", error);
-    fallbackTwiml.message("❌ Server error. Please try again.");
-    res.type('text/xml').send(fallbackTwiml.toString());
+    await sendText(from, "❌ Server error. Please try again.");
+    res.send('');
   }
 });
 
-// --- 8. LOGIC HANDLERS (Return XML Strings) ---
+// --- 8. LOGIC HANDLERS (CUSTOMER) ---
+// These functions now use the API helpers
 
 async function resetUser(from) {
   await db.ref(`users/${from}`).set({
@@ -289,38 +316,38 @@ async function resetUser(from) {
     errand_data: {}
   });
   const welcomeMsg = `🍽️ *Welcome to ChowZone!*`;
-  return createTwiml(welcomeMsg, getButtonsXml([
+  await sendButtons(from, welcomeMsg, [
     { title: "Order Food", id: "1" },
     { title: "Errands", id: "2" }
-  ]));
+  ]);
 }
 
 async function handleMainMenu(from, msg) {
   if (msg === '1') {
     await db.ref(`users/${from}`).update({ step: 'vendor_select', order_type: 'food' });
-    return createTwiml(`🏪 *Select Vendor*`, getButtonsXml([
+    await sendButtons(from, `🏪 *Select Vendor*`, [
       { title: VENDOR_NAME, id: "1" }
-    ]));
+    ]);
   } else if (msg === '2') {
     await db.ref(`users/${from}`).update({ step: 'errand_type', order_type: 'errand' });
-    return createTwiml("🏃 *Select Errand Type*", getListXml("Choose Type", [
+    await sendList(from, "🏃 *Select Errand Type*", "Choose Type", [
       { id: "1", title: "🛒 Market Shopping", description: "We buy items for you" },
       { id: "2", title: "📦 Pick Up Item", description: "Collect a package" },
       { id: "3", title: "💊 Pharmacy / Supermarket", description: "Emergency supplies" },
       { id: "4", title: "📝 Campus Task", description: "General campus errands" }
-    ]));
+    ]);
   } else {
-    return createTwiml("Invalid option.");
+    await sendText(from, "Invalid option.");
   }
 }
 
 async function showCategories(from) {
   await db.ref(`users/${from}/step`).set('category_select');
-  return createTwiml(`🍽️ *${VENDOR_NAME} Categories*`, getButtonsXml([
+  await sendButtons(from, `🍽️ *${VENDOR_NAME} Categories*`, [
     { title: "🍚 Rice Meals", id: "1" },
     { title: "🥘 Swallow & Solids", id: "2" },
     { title: "🍗 Proteins / Add-ons", id: "3" }
-  ]));
+  ]);
 }
 
 async function handleCategorySelect(from, choice) {
@@ -329,7 +356,7 @@ async function handleCategorySelect(from, choice) {
   if (choice === 2) categoryKey = 'SWALLOWS';
   if (choice === 3) categoryKey = 'PROTEINS';
 
-  if (!categoryKey) return createTwiml("Invalid category.");
+  if (!categoryKey) return await sendText(from, "Invalid category.");
 
   await db.ref(`users/${from}`).update({ step: 'item_select', current_category: categoryKey });
 
@@ -338,7 +365,7 @@ async function handleCategorySelect(from, choice) {
     return { id: item.id.toString(), title: item.name, description: priceTxt };
   });
 
-  return createTwiml(`*${categoryKey.replace('_', ' ')}*`, getListXml("Select Meal", listItems));
+  await sendList(from, `*${categoryKey.replace('_', ' ')}*`, "Select Meal", listItems);
 }
 
 async function handleItemSelect(from, id) {
@@ -347,18 +374,18 @@ async function handleItemSelect(from, id) {
   const cat = MENU_CATEGORIES[user.current_category];
   const item = cat.find(i => i.id === id);
 
-  if (!item) return createTwiml("Invalid item number.");
+  if (!item) return await sendText(from, "Invalid item number.");
   
   await db.ref(`users/${from}`).update({ step: 'size_select', selected_item: item });
 
   if (item.reg === item.ext) {
     await db.ref(`users/${from}/step`).set('quantity_select');
-    return createTwiml(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many? (Reply number)`);
+    await sendText(from, `*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many? (Reply number)`);
   } else {
-    return createTwiml(`*${item.name}*\n\nSelect Portion:`, getButtonsXml([
+    await sendButtons(from, `*${item.name}*\n\nSelect Portion:`, [
       { title: `Regular (${formatCurrency(item.reg)})`, id: "1" },
       { title: `Extra (${formatCurrency(item.ext)})`, id: "2" }
-    ]));
+    ]);
   }
 }
 
@@ -374,7 +401,7 @@ async function handleSizeSelect(from, choice) {
     selected_size: choice === 1 ? 'Regular' : 'Extra'
   });
 
-  return createTwiml(`*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nPrice: ${formatCurrency(price)}\n\nHow many? (Reply number)`);
+  await sendText(from, `*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nPrice: ${formatCurrency(price)}\n\nHow many? (Reply number)`);
 }
 
 async function handleQuantitySelect(from, qty) {
@@ -391,12 +418,12 @@ async function handleQuantitySelect(from, qty) {
 
   if (user.current_category !== 'PROTEINS') {
     await db.ref(`users/${from}`).update({ step: 'protein_loop', cart: cart });
-    return createTwiml(`✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?`, getButtonsXml([
+    await sendButtons(from, `✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?`, [
       { title: "Yes, add protein", id: "1" },
       { title: "No, checkout", id: "2" }
-    ]));
+    ]);
   } else {
-    return showCartSummary(from, cart);
+    await showCartSummary(from, cart);
   }
 }
 
@@ -407,32 +434,31 @@ async function handleProteinLoop(from, msg) {
        const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)}+`;
        return { id: item.id.toString(), title: item.name, description: priceTxt };
     });
-    
     await db.ref(`users/${from}/step`).set('protein_select');
-    return createTwiml("🍗 *Proteins & Sides*", getListXml("Choose Protein", listItems));
+    await sendList(from, "🍗 *Proteins & Sides*", "Choose Protein", listItems);
   } else if (msg === '2') {
     const userSnap = await db.ref(`users/${from}`).once('value');
-    return showCartSummary(from, userSnap.val().cart);
+    await showCartSummary(from, userSnap.val().cart);
   } else {
-    return createTwiml("Invalid selection.");
+    await sendText(from, "Invalid selection.");
   }
 }
 
 async function handleProteinSelect(from, id) {
   const cat = MENU_CATEGORIES['PROTEINS'];
   const item = cat.find(i => i.id === id);
-  if (!item) return createTwiml("Invalid item.");
+  if (!item) return await sendText(from, "Invalid item.");
 
   await db.ref(`users/${from}`).update({ step: 'protein_size', selected_item: item });
 
   if (item.reg === item.ext) {
     await db.ref(`users/${from}/step`).set('protein_qty');
-    return createTwiml(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many pieces? (Reply number)`);
+    await sendText(from, `*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many pieces? (Reply number)`);
   } else {
-    return createTwiml(`*${item.name}*`, getButtonsXml([
+    await sendButtons(from, `*${item.name}*`, [
       { title: `Regular (${formatCurrency(item.reg)})`, id: "1" },
       { title: `Extra (${formatCurrency(item.ext)})`, id: "2" }
-    ]));
+    ]);
   }
 }
 
@@ -446,7 +472,7 @@ async function handleProteinSize(from, choice) {
     selected_item_price: item[size],
     selected_size: choice === 1 ? 'Regular' : 'Extra'
   });
-  return createTwiml(`*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nHow many pieces? (Reply number)`);
+  await sendText(from, `*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nHow many pieces? (Reply number)`);
 }
 
 async function handleProteinQty(from, qty) {
@@ -460,10 +486,10 @@ async function handleProteinQty(from, qty) {
   cart.push(newItem);
 
   await db.ref(`users/${from}`).update({ cart: cart, step: 'protein_loop' });
-  return createTwiml(`✅ Added ${qty}x ${item.name}.\n\nAdd another protein?`, getButtonsXml([
+  await sendButtons(from, `✅ Added ${qty}x ${item.name}.\n\nAdd another protein?`, [
     { title: "Yes, add more", id: "1" },
     { title: "No, checkout", id: "2" }
-  ]));
+  ]);
 }
 
 async function showCartSummary(from, cart) {
@@ -478,10 +504,10 @@ async function showCartSummary(from, cart) {
 
   await db.ref(`users/${from}`).update({ step: 'add_more_or_checkout', cart_subtotal: sub });
   
-  return createTwiml(txt, getButtonsXml([
+  await sendButtons(from, txt, [
     { title: "Add Food", id: "1" },
     { title: "Proceed to Delivery", id: "2" }
-  ]));
+  ]);
 }
 
 // --- ERRAND HANDLERS ---
@@ -494,7 +520,7 @@ async function handleErrandType(from, type) {
   else if (type === 2) { typeStr = "PICK_UP"; }
   else if (type === 3) { typeStr = "PHARMACY"; needsShopping = true; }
   else if (type === 4) { typeStr = "TASK"; }
-  else return createTwiml("Invalid.");
+  else return await sendText(from, "Invalid.");
 
   await db.ref(`users/${from}`).update({
     step: needsShopping ? 'errand_details' : 'errand_location', 
@@ -503,9 +529,9 @@ async function handleErrandType(from, type) {
   });
 
   if (needsShopping) {
-    return createTwiml(`📝 *List the items you want to buy.*\n\nFormat: Item Price, Item Price\nExample: Beans 2000, Oil 500`);
+    await sendText(from, `📝 *List the items you want to buy.*\n\nFormat: Item Price, Item Price\nExample: Beans 2000, Oil 500`);
   } else {
-    return createTwiml(`📝 *Describe the task or pickup:*`);
+    await sendText(from, `📝 *Describe the task or pickup:*`);
   }
 }
 
@@ -526,7 +552,7 @@ async function handleErrandDetails(from, text) {
     }
   });
 
-  if (items.length === 0) return createTwiml("⚠️ Could not read prices. Example: 'Beans 2000'");
+  if (items.length === 0) return await sendText(from, "⚠️ Could not read prices. Example: 'Beans 2000'");
 
   await db.ref(`users/${from}`).update({
     step: 'errand_location',
@@ -537,17 +563,17 @@ async function handleErrandDetails(from, text) {
   let msg = `✅ Items saved:\n`;
   items.forEach(i => msg += `- ${i.name}: ${formatCurrency(i.price)}\n`);
   msg += `\nTotal Items Cost: ${formatCurrency(budget)}\n\n📍 Where is the pickup location?`;
-  return createTwiml(msg);
+  await sendText(from, msg);
 }
 
 async function handleErrandLocation(from, text) {
   await db.ref(`users/${from}`).update({ step: 'delivery_location', pickup_location: text });
-  return createTwiml("📍 Where should the rider drop the items? (Your Hostel/Room)");
+  await sendText(from, "📍 Where should the rider drop the items? (Your Hostel/Room)");
 }
 
 async function handleDeliveryLocation(from, text) {
   await db.ref(`users/${from}`).update({ step: 'phone_number', delivery_location: text });
-  return createTwiml("📞 Please share your Phone Number for the rider.");
+  await sendText(from, "📞 Please share your Phone Number for the rider.");
 }
 
 async function handlePhoneNumber(from, text) {
@@ -580,25 +606,25 @@ async function handlePhoneNumber(from, text) {
 
   await db.ref(`users/${from}`).update({ final_total: total });
 
-  return createTwiml(summary, getButtonsXml([
+  await sendButtons(from, summary, [
     { title: "CONFIRM ORDER", id: "confirm" }
-  ]));
+  ]);
 }
 
 async function handleFinalConfirm(from, msg) {
-  if (msg !== 'confirm') return createTwiml("Please click the CONFIRM button to proceed.");
+  if (msg !== 'confirm') return await sendText(from, "Please click the CONFIRM button to proceed.");
 
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
 
   await db.ref(`users/${from}`).update({ step: 'awaiting_payment' });
 
-  return createTwiml(`💳 *Payment Details*\n\nPlease pay ${formatCurrency(user.final_total)} to:\n\n🏦 *Bank:* Monie Point\n👤 *Name:* ChowZone Dev\n🔢 *Acct:* 70437763589\n\n📸 *Send a screenshot of the receipt here to complete your order.*`);
+  await sendText(from, `💳 *Payment Details*\n\nPlease pay ${formatCurrency(user.final_total)} to:\n\n🏦 *Bank:* Monie Point\n👤 *Name:* ChowZone Dev\n🔢 *Acct:* 70437763589\n\n📸 *Send a screenshot of the receipt here to complete your order.*`);
 }
 
 // --- 9. ADMIN & ORDER LOGIC ---
 
-async function createOrderInDB(from, user, twiml) {
+async function createOrderInDB(from, user) {
   const orderId = generateId();
   const total = user.final_total;
 
@@ -618,30 +644,25 @@ async function createOrderInDB(from, user, twiml) {
   await db.ref(`orders/${orderId}`).set(orderData);
   await db.ref(`users/${from}`).update({ step: 'new' });
 
-  twiml.message(`✅ *Order Received!*\n\nYour Order #${orderId} is worth ${formatCurrency(total)}.\n\nWe are verifying your payment now. You will be notified shortly.`);
+  await sendText(from, `✅ *Order Received!*\n\nYour Order #${orderId} is worth ${formatCurrency(total)}.\n\nWe are verifying your payment now. You will be notified shortly.`);
 
-  try {
-    const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    let adminPhone = ADMIN_PHONE;
-    if (!adminPhone.startsWith('whatsapp:')) adminPhone = `whatsapp:${adminPhone}`;
+  let adminPhone = ADMIN_PHONE;
+  if (!adminPhone.startsWith('whatsapp:')) adminPhone = `whatsapp:${adminPhone}`;
 
-    let itemsList = "";
-    if (user.order_type === 'food') {
-      user.cart.forEach(c => itemsList += `- ${c.name} x${c.qty}\n`);
-    } else {
-      user.errand_items.forEach(i => itemsList += `- ${i.name}\n`);
-    }
-
-    const adminMsg = `💳 *NEW PAYMENT ALERT*\n\nOrder ID: #${orderId}\nCustomer: ${user.phone}\nTotal: ${formatCurrency(total)}\nItems:\n${itemsList}\n\n[Check WhatsApp for Screenshot]`;
-
-    await client.messages.create({
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: adminPhone,
-      body: adminMsg
-    });
-  } catch (err) {
-    console.error("Failed to send Admin notification:", err);
+  let itemsList = "";
+  if (user.order_type === 'food') {
+    user.cart.forEach(c => itemsList += `- ${c.name} x${c.qty}\n`);
+  } else {
+    user.errand_items.forEach(i => itemsList += `- ${i.name}\n`);
   }
+
+  const adminMsg = `💳 *NEW PAYMENT ALERT*\n\nOrder ID: #${orderId}\nCustomer: ${user.phone}\nTotal: ${formatCurrency(total)}\nItems:\n${itemsList}\n\n[Check WhatsApp for Screenshot]`;
+
+  await client.messages.create({
+    from: process.env.TWILIO_PHONE_NUMBER,
+    to: adminPhone,
+    body: adminMsg
+  });
 }
 
 async function approveOrder(orderId) {
@@ -650,7 +671,6 @@ async function approveOrder(orderId) {
   if (!order) return;
 
   await db.ref(`orders/${orderId}/status`).set('seeking_rider');
-  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   
   await client.messages.create({
     from: process.env.TWILIO_PHONE_NUMBER,
@@ -667,7 +687,6 @@ async function rejectOrder(orderId) {
   if (!order) return;
 
   await db.ref(`orders/${orderId}/status`).set('rejected');
-  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   await client.messages.create({
     from: process.env.TWILIO_PHONE_NUMBER,
     to: order.customer,
@@ -675,11 +694,11 @@ async function rejectOrder(orderId) {
   });
 }
 
-async function acceptOrder(riderPhone, orderId, twiml) {
+async function acceptOrder(riderPhone, orderId) {
   const snap = await db.ref(`orders/${orderId}`).once('value');
   const order = snap.val();
   
-  if (order.status !== 'seeking_rider') return twiml.message("Job already taken or closed.");
+  if (order.status !== 'seeking_rider') return;
 
   const riderSnap = await db.ref(`riders/${riderPhone}`).once('value');
   const rider = riderSnap.val();
@@ -689,9 +708,6 @@ async function acceptOrder(riderPhone, orderId, twiml) {
     rider_phone: riderPhone
   });
 
-  twiml.message(`✅ You have accepted Order #${orderId}. Connect with Admin directly.`);
-
-  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   const adminMsg = `🛵 *RIDER ACCEPTED*\n\nOrder #${orderId}\nRider: ${rider.name}\nPhone: ${riderPhone}\n\nPlease chat with rider to arrange details.`;
 
   await client.messages.create({
@@ -707,29 +723,25 @@ async function acceptOrder(riderPhone, orderId, twiml) {
   });
 }
 
-async function updateOrderStatus(orderId, status, twiml, from) {
+async function updateOrderStatus(orderId, status, from) {
   const snap = await db.ref(`orders/${orderId}`).once('value');
   const order = snap.val();
-  if (order.rider_phone !== from) return twiml.message("Not your order.");
+  if (order.rider_phone !== from) return;
 
   await db.ref(`orders/${orderId}/status`).set(status);
   
   if (status === 'delivered') {
-    const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
     await client.messages.create({
       from: process.env.TWILIO_PHONE_NUMBER,
       to: order.customer,
       body: `✅ *Order Delivered!*\n\nOrder #${orderId} is complete.\n\nThank you for using ChowZone! 🍽️`
     });
-    
-    twiml.message(`✅ Order #${orderId} marked as Delivered. Good job!`);
   }
 }
 
 async function broadcastToRiders(orderId, order) {
   const ridersSnap = await db.ref('riders').orderByChild('status').equalTo('on_duty').once('value');
   const riders = ridersSnap.val();
-  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   
   let msg = `🛵 NEW JOB #${orderId}\n`;
   msg += `Pickup: ${order.pickup_loc}\n`;
