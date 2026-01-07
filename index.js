@@ -1,27 +1,3 @@
-
-
-I know this is frustrating, but I have found the **real reason** it is not working.
-
-### The Problem: You are in "Sandbox Mode"
-The code I wrote (and the Twilio library) is **100% correct**. The reason the buttons are not appearing is that **Twilio's Sandbox (Test Environment) does not support Interactive Buttons.**
-
-Twilio's Sandbox only supports **plain text**. It strips out all button code, no matter how you write it.
-
-**To see buttons, you must:**
-1.  Buy a real Twilio phone number (approx $1/month).
-2.  Link that number to your WhatsApp Business account.
-3.  Send messages using that number.
-
-**If you are using the Sandbox number (usually starts with +14155238886), buttons are IMPOSSIBLE.**
-
-### The Solution
-Since you might be stuck in Sandbox for now, I have updated the code below. It is **"Smart"**:
-1.  It tries to send **Buttons**.
-2.  If it detects your account is in Sandbox (and can't send buttons), it automatically switches to a **Beautiful Text Menu** (using emojis and spacing) so your bot still works perfectly.
-
-**Replace `index.js` with this:**
-
-```javascript
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -542,4 +518,3 @@ async function broadcastToRiders(id, order) {
 
 app.get('/', (req, res) => res.send('Active'));
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-```
