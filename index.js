@@ -35,9 +35,6 @@ const RIDER_REG_CODE = process.env.RIDER_REG_CODE;
 const DELIVERY_FEE = parseInt(process.env.DELIVERY_FEE) || 500;
 const SHOPPING_FEE = parseInt(process.env.SHOPPING_FEE) || 500;
 
-// Initialize Twilio Client
-const client = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-
 // --- 4. MENU DATA (Bissy Joy Eatery) ---
 const VENDOR_NAME = "Bissy Joy Eatery";
 const MENU_CATEGORIES = {
@@ -82,47 +79,9 @@ function formatCurrency(amount) {
   return `₦${amount.toLocaleString()}`;
 }
 
-// --- 6. SMART SENDER (Tries Buttons, Falls back to Text) ---
-async function sendSmart(to, bodyText, actionConfig, fallbackTextOptions) {
-  // ATTEMPT 1: SEND BUTTONS
-  try {
-    await client.messages.create({
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: to,
-      body: bodyText,
-      action: actionConfig
-    });
-    console.log("Sent Buttons successfully.");
-    return; // Success!
-  } catch (err) {
-    console.log("Buttons failed (Likely Sandbox). Sending Text Menu...");
-    console.error(err);
-  }
-
-  // ATTEMPT 2: FALLBACK TO TEXT
-  let textMenu = bodyText + "\n\n";
-  if (fallbackTextOptions && fallbackTextOptions.type === 'buttons') {
-    fallbackTextOptions.buttons.forEach(btn => {
-      textMenu += `${btn.id}. ${btn.title}\n`;
-    });
-  } else if (fallbackTextOptions && fallbackTextOptions.type === 'list') {
-    // Flatten list to text
-    let count = 1;
-    fallbackTextOptions.items.forEach(item => {
-        textMenu += `${count}. ${item.title}\n`;
-        count++;
-    });
-  }
-  
-  await client.messages.create({
-    from: process.env.TWILIO_PHONE_NUMBER,
-    to: to,
-    body: textMenu
-  });
-}
-
-// --- 7. MAIN WEBHOOK ROUTE ---
+// --- 6. MAIN WEBHOOK ROUTE ---
 app.post('/whatsapp', async (req, res) => {
+  const twiml = new twilio.twiml.MessagingResponse();
   const from = req.body.From;
   const body = (req.body.Body || '').trim();
   const msg = body.toLowerCase(); 
@@ -132,16 +91,18 @@ app.post('/whatsapp', async (req, res) => {
   console.log(`[${new Date().toISOString()}] From: ${from}, Msg: ${body}, Media: ${numMedia}`);
 
   try {
-    // --- A. MEDIA HANDLING ---
+    // --- A. MEDIA HANDLING (Payment Screenshots) ---
     if (numMedia > 0) {
       const userSnap = await db.ref(`users/${from}`).once('value');
       const user = userSnap.val();
+      
       if (user && user.step === 'awaiting_payment') {
-        await createOrderInDB(from, user);
+        await createOrderInDB(from, user, twiml);
+        return res.type('text/xml').send(twiml.toString());
       } else {
-        await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "Please complete steps first." });
+        twiml.message("Please complete the text steps first. Reply 'Menu' to restart.");
+        return res.type('text/xml').send(twiml.toString());
       }
-      return res.send('');
     }
 
     // --- B. RIDER REGISTRATION ---
@@ -149,13 +110,19 @@ app.post('/whatsapp', async (req, res) => {
       const parts = originalMsg.split(' ');
       const code = parts[2];
       const riderName = parts.slice(3).join(' ') || "Rider";
+
       if (code === RIDER_REG_CODE) {
-        await db.ref(`riders/${from}`).set({ name: riderName, status: 'inactive', phone: from, joined_at: new Date().toISOString() });
-        await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `✅ Welcome ${riderName}. Text ON DUTY.` });
+        await db.ref(`riders/${from}`).set({
+          name: riderName,
+          status: 'inactive',
+          phone: from,
+          joined_at: new Date().toISOString()
+        });
+        twiml.message(`✅ Registration Successful!\n\nWelcome ${riderName}. Text "ON DUTY" to start.`);
       } else {
-        await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "❌ Invalid Code." });
+        twiml.message('❌ Invalid Registration Code.');
       }
-      return res.send('');
+      return res.type('text/xml').send(twiml.toString());
     }
 
     const userSnap = await db.ref(`users/${from}`).once('value');
@@ -164,14 +131,16 @@ app.post('/whatsapp', async (req, res) => {
     // --- C. ADMIN COMMANDS ---
     if (from === ADMIN_PHONE) {
       if (msg.startsWith('approve ')) {
-        await approveOrder(msg.split(' ')[1]);
-        await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `Order Approved.` });
-        return res.send('');
+        const orderId = msg.split(' ')[1];
+        await approveOrder(orderId);
+        twiml.message(`Order #${orderId} Approved.`);
+        return res.type('text/xml').send(twiml.toString());
       }
       if (msg.startsWith('reject ')) {
-        await rejectOrder(msg.split(' ')[1]);
-        await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `Order Rejected.` });
-        return res.send('');
+        const orderId = msg.split(' ')[1];
+        await rejectOrder(orderId);
+        twiml.message(`Order #${orderId} Rejected.`);
+        return res.type('text/xml').send(twiml.toString());
       }
     }
 
@@ -182,339 +151,611 @@ app.post('/whatsapp', async (req, res) => {
     if (rider) {
       if (msg === 'on duty') {
         await db.ref(`riders/${from}/status`).set('on_duty');
-        await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: '✅ ON DUTY.' });
-        return res.send('');
+        twiml.message('✅ You are ON DUTY.');
+        return res.type('text/xml').send(twiml.toString());
       }
       if (msg === 'off duty') {
         await db.ref(`riders/${from}/status`).set('inactive');
-        await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: '⚠️ OFF DUTY.' });
-        return res.send('');
+        twiml.message('⚠️ You are OFF DUTY.');
+        return res.type('text/xml').send(twiml.toString());
       }
       if (msg.startsWith('accept ')) {
-        await acceptOrder(from, msg.split(' ')[1]);
-        await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `✅ Order Accepted.` });
-        return res.send('');
+        const orderId = msg.split(' ')[1];
+        await acceptOrder(from, orderId, twiml);
+        return res.type('text/xml').send(twiml.toString());
       }
       if (msg.startsWith('delivered')) {
-        await updateOrderStatus(msg.split(' ')[1], 'delivered', from);
-        await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `✅ Delivered.` });
-        return res.send('');
+        await updateOrderStatus(msg.split(' ')[1], 'delivered', twiml, from);
+        return res.type('text/xml').send(twiml.toString());
       }
     }
 
     // --- E. CUSTOMER FLOW STATE MACHINE ---
     if (msg === 'hi' || msg === 'menu' || msg === '0') {
-      await resetUser(from);
-      return res.send('');
+      await resetUser(from, twiml);
+      return res.type('text/xml').send(twiml.toString());
     }
 
     switch (user.step) {
       case 'new':
       case 'main_menu':
-        await handleMainMenu(from, msg);
+        await handleMainMenu(from, msg, twiml);
         break;
       case 'vendor_select':
-        if (msg === '1') await showCategories(from);
-        else await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "Invalid." });
+        if (msg === '1') await showCategories(from, twiml);
+        else twiml.message("Invalid option.");
         break;
       case 'category_select':
-        await handleCategorySelect(from, parseInt(msg));
+        await handleCategorySelect(from, parseInt(msg), twiml);
         break;
       case 'item_select':
-        await handleItemSelect(from, parseInt(msg));
+        await handleItemSelect(from, parseInt(msg), twiml);
         break;
       case 'size_select':
-        await handleSizeSelect(from, msg);
+        await handleSizeSelect(from, msg, twiml);
         break;
       case 'quantity_select':
-        await handleQuantitySelect(from, parseInt(msg));
+        await handleQuantitySelect(from, parseInt(msg), twiml);
         break;
       case 'protein_loop':
-        await handleProteinLoop(from, msg);
+        await handleProteinLoop(from, msg, twiml);
         break;
       case 'protein_select':
-        await handleProteinSelect(from, parseInt(msg));
+        await handleProteinSelect(from, parseInt(msg), twiml);
         break;
       case 'protein_size':
-        await handleProteinSize(from, msg);
+        await handleProteinSize(from, msg, twiml);
         break;
       case 'protein_qty':
-        await handleProteinQty(from, parseInt(msg));
+        await handleProteinQty(from, parseInt(msg), twiml);
         break;
       case 'add_more_or_checkout':
-        if (msg === '1') await showCategories(from); 
-        else if (msg === '2') await handleDeliveryLocation(from, ""); 
-        else await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "Invalid." });
+        if (msg === '1') {
+           await showCategories(from, twiml); 
+        } else if (msg === '2') {
+           await handleDeliveryLocation(from, "", twiml); 
+        } else {
+           twiml.message("Reply 1 or 2.");
+        }
         break;
       case 'errand_type':
-        await handleErrandType(from, parseInt(msg));
+        await handleErrandType(from, parseInt(msg), twiml);
         break;
       case 'errand_details':
-        await handleErrandDetails(from, originalMsg);
+        await handleErrandDetails(from, originalMsg, twiml);
         break;
       case 'errand_location':
-        await handleErrandLocation(from, originalMsg);
+        await handleErrandLocation(from, originalMsg, twiml);
         break;
       case 'delivery_location':
-        await handleDeliveryLocation(from, originalMsg);
+        await handleDeliveryLocation(from, originalMsg, twiml);
         break;
       case 'phone_number':
-        await handlePhoneNumber(from, originalMsg);
+        await handlePhoneNumber(from, originalMsg, twiml);
         break;
       case 'confirm_order':
-        await handleFinalConfirm(from, msg);
+        await handleFinalConfirm(from, msg, twiml);
         break;
       default:
-        await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "I didn't understand. Reply Menu." });
+        twiml.message("I didn't understand that. Reply 'Menu'.");
     }
 
-    res.send('');
+    res.type('text/xml').send(twiml.toString());
 
   } catch (error) {
     console.error("Error:", error);
-    await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "❌ Bot Error. Please try again." });
-    res.send('');
+    twiml.message("❌ Server error. Please try again.");
+    res.type('text/xml').send(twiml.toString());
   }
 });
 
-// --- 8. LOGIC HANDLERS ---
+// --- 7. LOGIC HANDLERS (CUSTOMER) ---
 
-async function resetUser(from) {
-  await db.ref(`users/${from}`).set({ step: 'main_menu', cart: [], order_type: null });
-  await sendSmart(from, `🍽️ *Welcome to ChowZone!*`, {
-    type: 'buttons',
-    buttons: [{ type: 'reply', id: "1", title: "Order Food" }, { type: 'reply', id: "2", title: "Errands" }]
-  }, { type: 'buttons', buttons: [{ id: "1", title: "Order Food" }, { id: "2", title: "Errands" }] });
+async function resetUser(from, twiml) {
+  await db.ref(`users/${from}`).set({
+    step: 'main_menu',
+    cart: [],
+    order_type: null,
+    errand_data: {}
+  });
+  const welcomeMsg = `🍽️ *Welcome to ChowZone!*\n\nHow can we help you today?\n\n1. Order Food\n2. Errands (Market/Pharmacy/Pickup)\n\nReply with number 1 or 2.`;
+  twiml.message(welcomeMsg);
 }
 
-async function handleMainMenu(from, msg) {
+async function handleMainMenu(from, msg, twiml) {
   if (msg === '1') {
-    await db.ref(`users/${from}`).update({ step: 'vendor_select', order_type: 'food' });
-    await sendSmart(from, `🏪 *Select Vendor*`, {
-      type: 'buttons',
-      buttons: [{ type: 'reply', id: "1", title: VENDOR_NAME }]
-    }, { type: 'buttons', buttons: [{ id: "1", title: VENDOR_NAME }] });
+    await db.ref(`users/${from}`).update({
+      step: 'vendor_select',
+      order_type: 'food'
+    });
+    twiml.message(`🏪 *Select Vendor*\n\n1. ${VENDOR_NAME}\n\nReply 1.`);
   } else if (msg === '2') {
-    await db.ref(`users/${from}`).update({ step: 'errand_type', order_type: 'errand' });
-    await sendSmart(from, "🏃 *Select Errand Type*", {
-      type: 'list',
-      list: { button: "Choose", sections: [{ title: "Type", rows: [{id:"1",title:"Market"}, {id:"2",title:"Pick Up"}, {id:"3",title:"Pharmacy"}, {id:"4",title:"Task"}] }] }
-    }, { type: 'list', items: [{id:"1",title:"🛒 Market"}, {id:"2",title:"📦 Pick Up"}, {id:"3",title:"💊 Pharmacy"}, {id:"4",title:"📝 Task"}] });
+    await db.ref(`users/${from}`).update({
+      step: 'errand_type',
+      order_type: 'errand'
+    });
+    twiml.message(`🏃 *Select Errand Type*\n\n1. 🛒 Market Shopping\n2. 📦 Pick Up Item\n3. 💊 Pharmacy / Supermarket\n4. 📝 Campus Task\n\nReply with number.`);
   } else {
-    await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "Invalid." });
+    twiml.message("Invalid option.");
   }
 }
 
-async function showCategories(from) {
+async function showCategories(from, twiml) {
   await db.ref(`users/${from}/step`).set('category_select');
-  await sendSmart(from, `🍽️ *${VENDOR_NAME} Categories*`, {
-    type: 'buttons',
-    buttons: [{ type: 'reply', id: "1", title: "Rice Meals" }, { type: 'reply', id: "2", title: "Swallow" }, { type: 'reply', id: "3", title: "Proteins" }]
-  }, { type: 'buttons', buttons: [{ id: "1", title: "Rice Meals" }, { id: "2", title: "Swallow" }, { id: "3", title: "Proteins" }] });
+  let msg = `🍽️ *${VENDOR_NAME} Categories*\n\n`;
+  msg += `1. 🍚 Rice Meals\n2. 🥘 Swallow & Solids\n3. 🍗 Proteins / Add-ons\n\nReply number.`;
+  twiml.message(msg);
 }
 
-async function handleCategorySelect(from, choice) {
-  let cat = choice===1?'RICE_MEALS':choice===2?'SWALLOWS':choice===3?'PROTEINS':null;
-  if (!cat) return await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "Invalid cat." });
-  await db.ref(`users/${from}`).update({ step: 'item_select', current_category: cat });
-  const items = MENU_CATEGORIES[cat].map(i=>({id:i.id.toString(),title:i.name,description:`₦${i.reg}`}));
-  await sendSmart(from, `*${cat}*`, {
-    type: 'list',
-    list: { button: "Choose", sections: [{ title: "Pick", rows: items }] }
-  }, { type: 'list', items });
+async function handleCategorySelect(from, choice, twiml) {
+  let categoryKey = '';
+  if (choice === 1) categoryKey = 'RICE_MEALS';
+  if (choice === 2) categoryKey = 'SWALLOWS';
+  if (choice === 3) categoryKey = 'PROTEINS';
+
+  if (!categoryKey) return twiml.message("Invalid category.");
+
+  await db.ref(`users/${from}`).update({
+    step: 'item_select',
+    current_category: categoryKey
+  });
+
+  let msg = `*${categoryKey.replace('_', ' ')}*\n\n`;
+  MENU_CATEGORIES[categoryKey].forEach(item => {
+    const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`;
+    msg += `${item.id}. ${item.name} - ${priceTxt}\n`;
+  });
+  msg += `\nReply item number.`;
+  twiml.message(msg);
 }
 
-async function handleItemSelect(from, id) {
-  const user = (await db.ref(`users/${from}`).once('value')).val();
-  const item = MENU_CATEGORIES[user.current_category].find(i=>i.id===id);
-  if (!item) return await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "Invalid item." });
-  await db.ref(`users/${from}`).update({ step: 'size_select', selected_item: item });
+async function handleItemSelect(from, id, twiml) {
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const user = userSnap.val();
+  const cat = MENU_CATEGORIES[user.current_category];
+  const item = cat.find(i => i.id === id);
+
+  if (!item) return twiml.message("Invalid item number.");
+  
+  await db.ref(`users/${from}`).update({
+    step: 'size_select',
+    selected_item: item
+  });
+
   if (item.reg === item.ext) {
     await db.ref(`users/${from}/step`).set('quantity_select');
-    await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `Price: ${formatCurrency(item.reg)}\n\nHow many?` });
+    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many?`);
   } else {
-    await sendSmart(from, `*${item.name}*`, {
-      type: 'buttons',
-      buttons: [{ type: 'reply', id: "1", title: `Regular ${formatCurrency(item.reg)}` }, { type: 'reply', id: "2", title: `Extra ${formatCurrency(item.ext)}` }]
-    }, { type: 'buttons', buttons: [{ id: "1", title: "Regular" }, { id: "2", title: "Extra" }] });
+    let msg = `*${item.name}*\n\nSelect Portion:\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`;
+    twiml.message(msg);
   }
 }
 
-async function handleSizeSelect(from, choice) {
-  const user = (await db.ref(`users/${from}`).once('value')).val();
-  const item = user.selected_item;
+async function handleSizeSelect(from, choice, twiml) {
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const item = userSnap.val().selected_item;
   const size = choice === 1 ? 'reg' : 'ext';
-  await db.ref(`users/${from}`).update({ step: 'quantity_select', selected_item_price: item[size], selected_size: choice===1?'Regular':'Extra' });
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `Price: ${formatCurrency(item[size])}\n\nHow many?` });
+  const price = item[size];
+
+  await db.ref(`users/${from}`).update({
+    step: 'quantity_select',
+    selected_item_price: price,
+    selected_size: choice === 1 ? 'Regular' : 'Extra'
+  });
+
+  twiml.message(`*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nPrice: ${formatCurrency(price)}\n\nHow many?`);
 }
 
-async function handleQuantitySelect(from, qty) {
-  const user = (await db.ref(`users/${from}`).once('value')).val();
-  const item = user.selected_item;
-  const newItem = { name: item.name, price: user.selected_item_price||item.reg, qty, size: user.selected_size||'Regular', type: user.current_category==='PROTEINS'?'protein':'main' };
-  const cart = user.cart||[]; cart.push(newItem);
+async function handleQuantitySelect(from, qty, twiml) {
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const user = userSnap.val();
+  const item = userSnap.val().selected_item;
+  const price = user.selected_item_price || item.reg;
+  const size = user.selected_size || (item.reg === item.ext ? 'Regular' : 'Regular');
+
+  const newItem = {
+    name: item.name,
+    price: price,
+    qty: qty,
+    size: size,
+    type: user.current_category === 'PROTEINS' ? 'protein' : 'main'
+  };
+
+  const cart = user.cart || [];
+  cart.push(newItem);
+
   if (user.current_category !== 'PROTEINS') {
-    await db.ref(`users/${from}`).update({ step: 'protein_loop', cart });
-    await sendSmart(from, `✅ Added ${qty}x ${item.name}.`, {
-      type: 'buttons', buttons: [{ type: 'reply', id: "1", title: "Add Protein" }, { type: 'reply', id: "2", title: "Checkout" }]
-    }, { type: 'buttons', buttons: [{ id: "1", title: "Add Protein" }, { id: "2", title: "Checkout" }] });
+    await db.ref(`users/${from}`).update({
+      step: 'protein_loop',
+      cart: cart
+    });
+    twiml.message(`✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`);
   } else {
-    await showCartSummary(from, cart);
+    await showCartSummary(from, cart, twiml);
   }
 }
 
-async function handleProteinLoop(from, msg) {
-  if (msg==='1') {
+async function handleProteinLoop(from, msg, twiml) {
+  if (msg === '1') {
+    const cat = MENU_CATEGORIES['PROTEINS'];
+    let txt = `🍗 *Proteins & Sides*\n\n`;
+    cat.forEach(item => {
+       const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`;
+       txt += `${item.id}. ${item.name} - ${priceTxt}\n`;
+    });
+    txt += `\nReply item number.`;
+    
     await db.ref(`users/${from}/step`).set('protein_select');
-    const items = MENU_CATEGORIES['PROTEINS'].map(i=>({id:i.id.toString(),title:i.name,description:`₦${i.reg}`}));
-    await sendSmart(from, "🍗 Proteins", {
-      type: 'list', list: { button: "Choose", sections: [{ title: "Pick", rows: items }] }
-    }, { type: 'list', items });
+    twiml.message(txt);
+  } else if (msg === '2') {
+    const userSnap = await db.ref(`users/${from}`).once('value');
+    await showCartSummary(from, userSnap.val().cart, twiml);
   } else {
-    const user = (await db.ref(`users/${from}`).once('value')).val();
-    await showCartSummary(from, user.cart);
+    twiml.message("Reply 1 or 2.");
   }
 }
 
-async function handleProteinSelect(from, id) {
-  const item = MENU_CATEGORIES['PROTEINS'].find(i=>i.id===id);
-  if (!item) return await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "Invalid." });
-  await db.ref(`users/${from}`).update({ step: 'protein_size', selected_item: item });
+async function handleProteinSelect(from, id, twiml) {
+  const cat = MENU_CATEGORIES['PROTEINS'];
+  const item = cat.find(i => i.id === id);
+  if (!item) return twiml.message("Invalid item.");
+
+  await db.ref(`users/${from}`).update({
+    step: 'protein_size',
+    selected_item: item
+  });
+
   if (item.reg === item.ext) {
     await db.ref(`users/${from}/step`).set('protein_qty');
-    await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `Price: ${formatCurrency(item.reg)}\n\nHow many?` });
+    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many pieces?`);
   } else {
-    await sendSmart(from, `*${item.name}*`, {
-      type: 'buttons', buttons: [{ type: 'reply', id: "1", title: "Regular" }, { type: 'reply', id: "2", title: "Extra" }]
-    }, { type: 'buttons', buttons: [{ id: "1", title: "Regular" }, { id: "2", title: "Extra" }] });
+    twiml.message(`*${item.name}*\n\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`);
   }
 }
 
-async function handleProteinSize(from, choice) {
-  const user = (await db.ref(`users/${from}`).once('value')).val();
-  const item = user.selected_item;
-  const size = choice===1?'reg':'ext';
-  await db.ref(`users/${from}`).update({ step: 'protein_qty', selected_item_price: item[size], selected_size: choice===1?'Regular':'Extra' });
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `How many?` });
+async function handleProteinSize(from, choice, twiml) {
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const item = userSnap.val().selected_item;
+  const size = choice === 1 ? 'reg' : 'ext';
+  
+  await db.ref(`users/${from}`).update({
+    step: 'protein_qty',
+    selected_item_price: item[size],
+    selected_size: choice === 1 ? 'Regular' : 'Extra'
+  });
+  twiml.message(`*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nHow many pieces?`);
 }
 
-async function handleProteinQty(from, qty) {
-  const user = (await db.ref(`users/${from}`).once('value')).val();
-  const item = user.selected_item;
-  const newItem = { name: item.name, price: user.selected_item_price, qty, size: user.selected_size, type: 'protein' };
-  const cart = user.cart||[]; cart.push(newItem);
-  await db.ref(`users/${from}`).update({ cart, step: 'protein_loop' });
-  await sendSmart(from, `✅ Added ${qty}x ${item.name}.`, {
-    type: 'buttons', buttons: [{ type: 'reply', id: "1", title: "More" }, { type: 'reply', id: "2", title: "Checkout" }]
-  }, { type: 'buttons', buttons: [{ id: "1", title: "More" }, { id: "2", title: "Checkout" }] });
+async function handleProteinQty(from, qty, twiml) {
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const user = userSnap.val();
+  const item = userSnap.val().selected_item;
+  
+  const newItem = {
+    name: item.name,
+    price: user.selected_item_price,
+    qty: qty,
+    size: user.selected_size,
+    type: 'protein'
+  };
+
+  const cart = user.cart || [];
+  cart.push(newItem);
+
+  await db.ref(`users/${from}`).update({ cart: cart, step: 'protein_loop' });
+  twiml.message(`✅ Added ${qty}x ${item.name}.\n\nAdd another protein?\n1. Yes\n2. No (Checkout)`);
 }
 
-async function showCartSummary(from, cart) {
-  let sub=0, txt=`🧾 *Cart*\n\n`;
-  cart.forEach(c=>{ const t=c.price*c.qty; sub+=t; txt+=`${c.name} x${c.qty} = ${formatCurrency(t)}\n`; });
-  txt+=`\nSubtotal: ${formatCurrency(sub)}`;
-  await db.ref(`users/${from}`).update({ step: 'add_more_or_checkout', cart_subtotal: sub });
-  await sendSmart(from, txt, {
-    type: 'buttons', buttons: [{ type: 'reply', id: "1", title: "Add Food" }, { type: 'reply', id: "2", title: "Delivery" }]
-  }, { type: 'buttons', buttons: [{ id: "1", title: "Add Food" }, { id: "2", title: "Delivery" }] });
+async function showCartSummary(from, cart, twiml) {
+  let sub = 0;
+  let txt = `🧾 *Current Cart*\n\n`;
+  cart.forEach((c) => {
+    const t = c.price * c.qty;
+    sub += t;
+    txt += `${c.name} (${c.size}) x${c.qty} = ${formatCurrency(t)}\n`;
+  });
+  txt += `\n💰 Subtotal: ${formatCurrency(sub)}\n\n`;
+  txt += `Do you want to add another meal?\n1. Yes (Add Food)\n2. No (Proceed to Delivery)`;
+
+  await db.ref(`users/${from}`).update({
+    step: 'add_more_or_checkout',
+    cart_subtotal: sub
+  });
+  twiml.message(txt);
 }
 
 // --- ERRAND HANDLERS ---
-async function handleErrandType(from, type) {
-  const map={1:"MARKET",2:"PICK_UP",3:"PHARMACY",4:"TASK"};
-  if(!map[type]) return await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "Invalid." });
-  await db.ref(`users/${from}`).update({ step: [1,3].includes(type)?'errand_details':'errand_location', errand_type: map[type] });
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: [1,3].includes(type)?"List items: Item Price":"Describe task:" });
-}
 
-async function handleErrandDetails(from, text) {
-  const parts=text.split(','); let items=[], budget=0;
-  parts.forEach(p=>{ const sp=p.trim().split(' '); if(sp.length>=2){ const p=parseInt(sp.pop()); const n=sp.join(' '); if(!isNaN(p)){items.push({name:n,price:p}); budget+=p;} }});
-  if(items.length===0) return await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "Format error." });
-  await db.ref(`users/${from}`).update({ step: 'errand_location', errand_items: items, shopping_budget: budget });
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `Saved. Total: ${formatCurrency(budget)}.\n\n📍 Pickup?` });
-}
+async function handleErrandType(from, type, twiml) {
+  let typeStr = "";
+  let needsShopping = false;
+  
+  if (type === 1) { typeStr = "MARKET"; needsShopping = true; }
+  else if (type === 2) { typeStr = "PICK_UP"; }
+  else if (type === 3) { typeStr = "PHARMACY"; needsShopping = true; }
+  else if (type === 4) { typeStr = "TASK"; }
+  else return twiml.message("Invalid.");
 
-async function handleErrandLocation(from, text) {
-  await db.ref(`users/${from}`).update({ step: 'delivery_location', pickup_location: text });
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "📍 Delivery location?" });
-}
-
-async function handleDeliveryLocation(from, text) {
-  await db.ref(`users/${from}`).update({ step: 'phone_number', delivery_location: text });
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "📞 Phone?" });
-}
-
-async function handlePhoneNumber(from, text) {
-  const user = (await db.ref(`users/${from}`).once('value')).val();
-  const total = (user.cart_subtotal||user.shopping_budget||0) + DELIVERY_FEE + (user.needs_shopping?SHOPPING_FEE:0);
-  await db.ref(`users/${from}`).update({ phone: text, step: 'confirm_order', final_total: total });
-  await sendSmart(from, `Total: ${formatCurrency(total)}\nPay to Monie Point 70437763589.`, {
-    type: 'buttons', buttons: [{ type: 'reply', id: "confirm", title: "CONFIRM" }]
-  }, { type: 'buttons', buttons: [{ id: "confirm", title: "CONFIRM" }] });
-}
-
-async function handleFinalConfirm(from, msg) {
-  if(msg!=='confirm') return await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: "Click Confirm." });
-  const user = (await db.ref(`users/${from}`).once('value')).val();
-  await db.ref(`users/${from}`).update({ step: 'awaiting_payment' });
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `Send screenshot for ${formatCurrency(user.final_total)}.` });
-}
-
-async function createOrderInDB(from, user) {
-  const id = generateId();
-  await db.ref(`orders/${id}`).set({
-    id, customer: from, customer_phone: user.phone, type: user.order_type, status: 'pending_payment', total: user.final_total,
-    delivery_loc: user.delivery_location, pickup_loc: user.pickup_location||VENDOR_NAME,
-    details: user.order_type==='food'?user.cart:user.errand_items, timestamp: admin.database.ServerValue.TIMESTAMP
+  await db.ref(`users/${from}`).update({
+    step: needsShopping ? 'errand_details' : 'errand_location', 
+    errand_type: typeStr,
+    needs_shopping: needsShopping
   });
+
+  if (needsShopping) {
+    twiml.message(`📝 *List the items you want to buy.*\n\nFormat: Item Price, Item Price\nExample: Beans 2000, Oil 500`);
+  } else {
+    twiml.message(`📝 *Describe the task or pickup:*`);
+  }
+}
+
+async function handleErrandDetails(from, text, twiml) {
+  const parts = text.split(',');
+  let items = [];
+  let budget = 0;
+
+  parts.forEach(p => {
+    const subParts = p.trim().split(' ');
+    if (subParts.length >= 2) {
+      const price = parseInt(subParts.pop());
+      const name = subParts.join(' ');
+      if (!isNaN(price)) {
+        items.push({ name, price });
+        budget += price;
+      }
+    }
+  });
+
+  if (items.length === 0) return twiml.message("⚠️ Could not read prices. Example: 'Beans 2000'");
+
+  await db.ref(`users/${from}`).update({
+    step: 'errand_location',
+    errand_items: items,
+    shopping_budget: budget
+  });
+
+  let msg = `✅ Items saved:\n`;
+  items.forEach(i => msg += `- ${i.name}: ${formatCurrency(i.price)}\n`);
+  msg += `\nTotal Items Cost: ${formatCurrency(budget)}\n\n📍 Where is the pickup location?`;
+  twiml.message(msg);
+}
+
+async function handleErrandLocation(from, text, twiml) {
+  await db.ref(`users/${from}`).update({
+    step: 'delivery_location',
+    pickup_location: text
+  });
+  twiml.message("📍 Where should the rider drop the items? (Your Hostel/Room)");
+}
+
+async function handleDeliveryLocation(from, text, twiml) {
+  await db.ref(`users/${from}`).update({
+    step: 'phone_number',
+    delivery_location: text
+  });
+  twiml.message("📞 Please share your Phone Number for the rider.");
+}
+
+async function handlePhoneNumber(from, text, twiml) {
+  await db.ref(`users/${from}`).update({
+    phone: text,
+    step: 'confirm_order'
+  });
+
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const user = userSnap.val();
+  let total = 0;
+  let summary = `🧾 *ORDER SUMMARY*\n\n`;
+
+  if (user.order_type === 'food') {
+    total = user.cart_subtotal || 0;
+    user.cart.forEach(c => {
+      summary += `${c.name} (${c.size}) x${c.qty}\n`;
+    });
+    summary += `\nFood Cost: ${formatCurrency(total)}`;
+  } else {
+    total = user.shopping_budget || 0;
+    summary += `Items: ${formatCurrency(total)}\n`;
+    
+    if (user.needs_shopping) summary += `Shopping Fee: ${formatCurrency(SHOPPING_FEE)}\n`;
+    else summary += `Service Fee: ${formatCurrency(SHOPPING_FEE)}\n`;
+    
+    total += SHOPPING_FEE;
+  }
+
+  total += DELIVERY_FEE;
+  summary += `\nDelivery Fee: ${formatCurrency(DELIVERY_FEE)}`;
+  summary += `\n━━━━━━━━━━━\n💰 *TOTAL: ${formatCurrency(total)}*`;
+
+  await db.ref(`users/${from}`).update({ final_total: total });
+
+  summary += `\n\nReply "CONFIRM" to proceed to payment.`;
+  twiml.message(summary);
+}
+
+async function handleFinalConfirm(from, msg, twiml) {
+  if (msg !== 'confirm') return twiml.message("Please type CONFIRM to proceed.");
+
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const user = userSnap.val();
+
+  await db.ref(`users/${from}`).update({
+    step: 'awaiting_payment'
+  });
+
+  twiml.message(`💳 *Payment Details*\n\nPlease pay ${formatCurrency(user.final_total)} to:\n\n🏦 *Bank:* Monie Point\n👤 *Name:* ChowZone Dev\n🔢 *Acct:* 70437763589\n\n📸 *Send a screenshot of the receipt here to complete your order.*`);
+}
+
+// --- 8. ADMIN & ORDER LOGIC ---
+
+async function createOrderInDB(from, user, twiml) {
+  const orderId = generateId();
+  const total = user.final_total;
+
+  const orderData = {
+    id: orderId,
+    customer: from,
+    customer_phone: user.phone,
+    type: user.order_type,
+    status: 'pending_payment',
+    total: total,
+    delivery_loc: user.delivery_location,
+    pickup_loc: user.pickup_location || VENDOR_NAME,
+    details: user.order_type === 'food' ? user.cart : user.errand_items,
+    timestamp: admin.database.ServerValue.TIMESTAMP
+  };
+
+  await db.ref(`orders/${orderId}`).set(orderData);
   await db.ref(`users/${from}`).update({ step: 'new' });
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: from, body: `Order #${id} received.` });
+
+  twiml.message(`✅ *Order Received!*\n\nYour Order #${orderId} is worth ${formatCurrency(total)}.\n\nWe are verifying your payment now. You will be notified shortly.`);
+
+  // Notify Admin (Wrapped in try/catch)
   try {
+    const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    
+    let adminPhone = ADMIN_PHONE;
+    if (!adminPhone.startsWith('whatsapp:')) {
+      adminPhone = `whatsapp:${adminPhone}`;
+    }
+
+    let itemsList = "";
+    if (user.order_type === 'food') {
+      user.cart.forEach(c => itemsList += `- ${c.name} x${c.qty}\n`);
+    } else {
+      user.errand_items.forEach(i => itemsList += `- ${i.name}\n`);
+    }
+
+    const adminMsg = `💳 *NEW PAYMENT ALERT*\n\nOrder ID: #${orderId}\nCustomer: ${user.phone}\nTotal: ${formatCurrency(total)}\nItems:\n${itemsList}\n\n[Check WhatsApp for Screenshot]`;
+
     await client.messages.create({
       from: process.env.TWILIO_PHONE_NUMBER,
-      to: ADMIN_PHONE.startsWith('whatsapp:')?ADMIN_PHONE:`whatsapp:${ADMIN_PHONE}`,
-      body: `New Order #${id}\nTotal: ${formatCurrency(user.final_total)}`
+      to: adminPhone,
+      body: adminMsg
     });
-  } catch(e){}
+  } catch (err) {
+    console.error("Failed to send Admin notification:", err);
+  }
 }
 
-async function approveOrder(id) {
-  const snap = await db.ref(`orders/${id}`).once('value'); const order=snap.val();
-  await db.ref(`orders/${id}/status`).set('seeking_rider');
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: order.customer, body: `Payment Verified. Order #${id}` });
-  broadcastToRiders(id, order);
+async function approveOrder(orderId) {
+  const snap = await db.ref(`orders/${orderId}`).once('value');
+  const order = snap.val();
+  if (!order) return;
+
+  await db.ref(`orders/${orderId}/status`).set('seeking_rider');
+  
+  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  
+  // Notify Customer: Simplified
+  await client.messages.create({
+    from: process.env.TWILIO_PHONE_NUMBER,
+    to: order.customer,
+    body: `✅ *Payment Verified*\n\nYour Order #${orderId} has been placed! We are assigning a rider now.`
+  });
+
+  // Broadcast to Riders
+  broadcastToRiders(orderId, order);
 }
 
-async function rejectOrder(id) {
-  const snap = await db.ref(`orders/${id}`).once('value'); const order=snap.val();
-  await db.ref(`orders/${id}/status`).set('rejected');
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: order.customer, body: `Payment Failed. Order #${id}` });
-}
+async function rejectOrder(orderId) {
+  const snap = await db.ref(`orders/${orderId}`).once('value');
+  const order = snap.val();
+  if (!order) return;
 
-async function acceptOrder(from, id) {
-  const snap = await db.ref(`orders/${id}`).once('value'); const order=snap.val();
-  if(order.status!=='seeking_rider') return;
-  const rider=(await db.ref(`riders/${from}`).once('value')).val();
-  await db.ref(`orders/${id}`).update({ status:'rider_accepted', rider_phone: from });
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: ADMIN_PHONE, body: `Rider Accepted #${id}: ${rider.name}` });
-  await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: order.customer, body: `Rider Assigned #${id}: ${rider.name}` });
-}
+  await db.ref(`orders/${orderId}/status`).set('rejected');
 
-async function updateOrderStatus(id, status, from) {
-  const snap = await db.ref(`orders/${id}`).once('value'); const order=snap.val();
-  if(order.rider_phone!==from) return;
-  await db.ref(`orders/${id}/status`).set(status);
-  if(status==='delivered') await client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: order.customer, body: `Delivered #${id}` });
-}
-
-async function broadcastToRiders(id, order) {
-  const ridersSnap = await db.ref('riders').orderByChild('status').equalTo('on_duty').once('value'); const riders=ridersSnap.val();
-  const msg=`Job #${id}\nFee: ${formatCurrency(DELIVERY_FEE)}\nReply: ACCEPT ${id}`;
-  if(riders) Object.keys(riders).forEach(k=>{
-    if(riders[k].phone) client.messages.create({ from: process.env.TWILIO_PHONE_NUMBER, to: riders[k].phone, body: msg }).catch(e=>console.log(e));
+  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  await client.messages.create({
+    from: process.env.TWILIO_PHONE_NUMBER,
+    to: order.customer,
+    body: `❌ *Payment Not Found*\n\nWe could not verify your payment for Order #${orderId}. Please contact Admin or try again.`
   });
 }
 
-app.get('/', (req, res) => res.send('Active'));
+async function acceptOrder(riderPhone, orderId, twiml) {
+  const snap = await db.ref(`orders/${orderId}`).once('value');
+  const order = snap.val();
+  
+  if (order.status !== 'seeking_rider') return twiml.message("Job already taken or closed.");
+
+  // Get Rider Name
+  const riderSnap = await db.ref(`riders/${riderPhone}`).once('value');
+  const rider = riderSnap.val();
+
+  await db.ref(`orders/${orderId}`).update({
+    status: 'rider_accepted',
+    rider_phone: riderPhone
+  });
+
+  twiml.message(`✅ You have accepted Order #${orderId}. Connect with Admin directly.`);
+
+  // Notify Admin (Provide Rider Info)
+  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  const adminMsg = `🛵 *RIDER ACCEPTED*\n\nOrder #${orderId}\nRider: ${rider.name}\nPhone: ${riderPhone}\n\nPlease chat with rider to arrange details.`;
+
+  await client.messages.create({
+    from: process.env.TWILIO_PHONE_NUMBER,
+    to: ADMIN_PHONE,
+    body: adminMsg
+  });
+
+  // Notify Customer (Provide Rider Phone)
+  await client.messages.create({
+    from: process.env.TWILIO_PHONE_NUMBER,
+    to: order.customer,
+    body: `🛵 *Rider Assigned*\n\nOrder #${orderId}\nRider Name: ${rider.name}\nRider Phone: ${riderPhone}\n\nExpect delivery shortly.`
+  });
+}
+
+async function updateOrderStatus(orderId, status, twiml, from) {
+  const snap = await db.ref(`orders/${orderId}`).once('value');
+  const order = snap.val();
+  if (order.rider_phone !== from) return twiml.message("Not your order.");
+
+  await db.ref(`orders/${orderId}/status`).set(status);
+  
+  if (status === 'delivered') {
+    const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    await client.messages.create({
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: order.customer,
+      body: `✅ *Order Delivered!*\n\nOrder #${orderId} is complete.\n\nThank you for using ChowZone! 🍽️`
+    });
+    
+    twiml.message(`✅ Order #${orderId} marked as Delivered. Good job!`);
+  }
+}
+
+async function broadcastToRiders(orderId, order) {
+  const ridersSnap = await db.ref('riders').orderByChild('status').equalTo('on_duty').once('value');
+  const riders = ridersSnap.val();
+  
+  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  
+  // Include Customer Phone in broadcast so rider can call them
+  let msg = `🛵 NEW JOB #${orderId}\n`;
+  msg += `Pickup: ${order.pickup_loc}\n`;
+  msg += `Dropoff: ${order.delivery_loc}\n`;
+  msg += `Customer: ${order.customer_phone}\n`; 
+  msg += `Fee: ${formatCurrency(DELIVERY_FEE)}\n`;
+  msg += `Reply: ACCEPT ${orderId}`;
+
+  if (riders) {
+    Object.keys(riders).forEach(key => {
+      const rider = riders[key];
+      if (rider.phone) {
+        client.messages.create({
+          from: process.env.TWILIO_PHONE_NUMBER,
+          to: rider.phone,
+          body: msg
+        }).then(message => console.log(message.sid))
+        .catch(err => console.error(err));
+      }
+    });
+  }
+}
+
+// --- 9. LISTEN ---
+app.get('/', (req, res) => res.send('ChowZone Bot is Active'));
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
