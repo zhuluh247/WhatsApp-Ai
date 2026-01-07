@@ -79,35 +79,50 @@ function formatCurrency(amount) {
   return `₦${amount.toLocaleString()}`;
 }
 
-// --- NEW: UI HELPERS FOR BUTTONS/LISTS ---
+// --- FORCE BUTTONS HELPER (Bypasses the library action function) ---
 function sendButtons(twiml, bodyText, buttons) {
-  // buttons format: [{ title: "Option A", id: "1" }, ...]
   const msg = twiml.message();
   msg.body(bodyText);
-  msg.action({
-    type: 'buttons',
-    buttons: buttons.map(b => ({
-      type: 'reply',
-      title: b.title,
-      id: b.id
-    }))
-  });
+
+  try {
+    // We create the Action node manually using the library's internal XML builder
+    const action = msg.node('Action', { type: 'buttons' });
+    buttons.forEach(btn => {
+      action.node('Button', { type: 'reply', id: btn.id }, btn.title);
+    });
+  } catch (e) {
+    console.error("Force Button Error:", e);
+    // If it fails completely, fallback to text
+    let textFallback = bodyText + "\n\n";
+    buttons.forEach(b => textFallback += `${b.id}. ${b.title}\n`);
+    msg.body(textFallback);
+  }
 }
 
 function sendList(twiml, bodyText, buttonLabel, items) {
-  // items format: [{ id: "1", title: "Item Name", description: "Price" }, ...]
   const msg = twiml.message();
   msg.body(bodyText);
-  msg.action({
-    type: 'list',
-    list: {
-      button: buttonLabel,
-      sections: [{
-        title: "Select Option",
-        rows: items
-      }]
-    }
-  });
+
+  try {
+    // We create the List XML structure manually
+    const action = msg.node('Action', { type: 'list' });
+    const list = action.node('List', { button: buttonLabel });
+    const section = list.node('Section', { title: 'Select Option' });
+
+    items.forEach(item => {
+      const row = section.node('Row', { id: item.id });
+      row.node('Title', {}, item.title);
+      if (item.description) {
+        row.node('Description', {}, item.description);
+      }
+    });
+  } catch (e) {
+    console.error("Force List Error:", e);
+    // Fallback to text
+    let textFallback = bodyText + "\n\n";
+    items.forEach(i => textFallback += `${i.id}. ${i.title} - ${i.description || ''}\n`);
+    msg.body(textFallback);
+  }
 }
 
 // --- 6. MAIN WEBHOOK ROUTE ---
