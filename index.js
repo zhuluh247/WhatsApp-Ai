@@ -79,6 +79,37 @@ function formatCurrency(amount) {
   return `₦${amount.toLocaleString()}`;
 }
 
+// --- NEW: UI HELPERS FOR BUTTONS/LISTS ---
+function sendButtons(twiml, bodyText, buttons) {
+  // buttons format: [{ title: "Option A", id: "1" }, ...]
+  const msg = twiml.message();
+  msg.body(bodyText);
+  msg.action({
+    type: 'buttons',
+    buttons: buttons.map(b => ({
+      type: 'reply',
+      title: b.title,
+      id: b.id
+    }))
+  });
+}
+
+function sendList(twiml, bodyText, buttonLabel, items) {
+  // items format: [{ id: "1", title: "Item Name", description: "Price" }, ...]
+  const msg = twiml.message();
+  msg.body(bodyText);
+  msg.action({
+    type: 'list',
+    list: {
+      button: buttonLabel,
+      sections: [{
+        title: "Select Option",
+        rows: items
+      }]
+    }
+  });
+}
+
 // --- 6. MAIN WEBHOOK ROUTE ---
 app.post('/whatsapp', async (req, res) => {
   const twiml = new twilio.twiml.MessagingResponse();
@@ -215,7 +246,7 @@ app.post('/whatsapp', async (req, res) => {
         } else if (msg === '2') {
            await handleDeliveryLocation(from, "", twiml); 
         } else {
-           twiml.message("Reply 1 or 2.");
+           twiml.message("Invalid selection.");
         }
         break;
       case 'errand_type':
@@ -258,8 +289,11 @@ async function resetUser(from, twiml) {
     order_type: null,
     errand_data: {}
   });
-  const welcomeMsg = `🍽️ *Welcome to ChowZone!*\n\nHow can we help you today?\n\n1. Order Food\n2. Errands (Market/Pharmacy/Pickup)\n\nReply with number 1 or 2.`;
-  twiml.message(welcomeMsg);
+  const welcomeMsg = `🍽️ *Welcome to ChowZone!*`;
+  sendButtons(twiml, welcomeMsg, [
+    { title: "Order Food", id: "1" },
+    { title: "Errands", id: "2" }
+  ]);
 }
 
 async function handleMainMenu(from, msg, twiml) {
@@ -268,13 +302,22 @@ async function handleMainMenu(from, msg, twiml) {
       step: 'vendor_select',
       order_type: 'food'
     });
-    twiml.message(`🏪 *Select Vendor*\n\n1. ${VENDOR_NAME}\n\nReply 1.`);
+    // Only one vendor, so a simple button to confirm
+    sendButtons(twiml, `🏪 *Select Vendor*`, [
+      { title: VENDOR_NAME, id: "1" }
+    ]);
   } else if (msg === '2') {
     await db.ref(`users/${from}`).update({
       step: 'errand_type',
       order_type: 'errand'
     });
-    twiml.message(`🏃 *Select Errand Type*\n\n1. 🛒 Market Shopping\n2. 📦 Pick Up Item\n3. 💊 Pharmacy / Supermarket\n4. 📝 Campus Task\n\nReply with number.`);
+    // 4 Options, use List Message
+    sendList(twiml, "🏃 *Select Errand Type*", "Choose Type", [
+      { id: "1", title: "🛒 Market Shopping", description: "We buy items for you" },
+      { id: "2", title: "📦 Pick Up Item", description: "Collect a package" },
+      { id: "3", title: "💊 Pharmacy / Supermarket", description: "Emergency supplies" },
+      { id: "4", title: "📝 Campus Task", description: "General campus errands" }
+    ]);
   } else {
     twiml.message("Invalid option.");
   }
@@ -282,9 +325,12 @@ async function handleMainMenu(from, msg, twiml) {
 
 async function showCategories(from, twiml) {
   await db.ref(`users/${from}/step`).set('category_select');
-  let msg = `🍽️ *${VENDOR_NAME} Categories*\n\n`;
-  msg += `1. 🍚 Rice Meals\n2. 🥘 Swallow & Solids\n3. 🍗 Proteins / Add-ons\n\nReply number.`;
-  twiml.message(msg);
+  // 3 Options, use Buttons
+  sendButtons(twiml, `🍽️ *${VENDOR_NAME} Categories*`, [
+    { title: "🍚 Rice Meals", id: "1" },
+    { title: "🥘 Swallow & Solids", id: "2" },
+    { title: "🍗 Proteins / Add-ons", id: "3" }
+  ]);
 }
 
 async function handleCategorySelect(from, choice, twiml) {
@@ -300,13 +346,17 @@ async function handleCategorySelect(from, choice, twiml) {
     current_category: categoryKey
   });
 
-  let msg = `*${categoryKey.replace('_', ' ')}*\n\n`;
-  MENU_CATEGORIES[categoryKey].forEach(item => {
-    const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`;
-    msg += `${item.id}. ${item.name} - ${priceTxt}\n`;
+  // Multiple items, use List Message
+  const listItems = MENU_CATEGORIES[categoryKey].map(item => {
+    const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)}+`;
+    return {
+      id: item.id.toString(), // Twilio IDs must be strings
+      title: item.name,
+      description: priceTxt
+    };
   });
-  msg += `\nReply item number.`;
-  twiml.message(msg);
+
+  sendList(twiml, `*${categoryKey.replace('_', ' ')}*`, "Select Meal", listItems);
 }
 
 async function handleItemSelect(from, id, twiml) {
@@ -324,10 +374,13 @@ async function handleItemSelect(from, id, twiml) {
 
   if (item.reg === item.ext) {
     await db.ref(`users/${from}/step`).set('quantity_select');
-    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many?`);
+    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many? (Reply number)`);
   } else {
-    let msg = `*${item.name}*\n\nSelect Portion:\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`;
-    twiml.message(msg);
+    // 2 Options, use Buttons
+    sendButtons(twiml, `*${item.name}*\n\nSelect Portion:`, [
+      { title: `Regular (${formatCurrency(item.reg)})`, id: "1" },
+      { title: `Extra (${formatCurrency(item.ext)})`, id: "2" }
+    ]);
   }
 }
 
@@ -343,7 +396,7 @@ async function handleSizeSelect(from, choice, twiml) {
     selected_size: choice === 1 ? 'Regular' : 'Extra'
   });
 
-  twiml.message(`*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nPrice: ${formatCurrency(price)}\n\nHow many?`);
+  twiml.message(`*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nPrice: ${formatCurrency(price)}\n\nHow many? (Reply number)`);
 }
 
 async function handleQuantitySelect(from, qty, twiml) {
@@ -369,7 +422,10 @@ async function handleQuantitySelect(from, qty, twiml) {
       step: 'protein_loop',
       cart: cart
     });
-    twiml.message(`✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`);
+    sendButtons(twiml, `✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?`, [
+      { title: "Yes, add protein", id: "1" },
+      { title: "No, checkout", id: "2" }
+    ]);
   } else {
     await showCartSummary(from, cart, twiml);
   }
@@ -378,20 +434,24 @@ async function handleQuantitySelect(from, qty, twiml) {
 async function handleProteinLoop(from, msg, twiml) {
   if (msg === '1') {
     const cat = MENU_CATEGORIES['PROTEINS'];
-    let txt = `🍗 *Proteins & Sides*\n\n`;
-    cat.forEach(item => {
-       const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`;
-       txt += `${item.id}. ${item.name} - ${priceTxt}\n`;
+    
+    // Proteins list
+    const listItems = cat.map(item => {
+       const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)}+`;
+       return {
+         id: item.id.toString(),
+         title: item.name,
+         description: priceTxt
+       };
     });
-    txt += `\nReply item number.`;
     
     await db.ref(`users/${from}/step`).set('protein_select');
-    twiml.message(txt);
+    sendList(twiml, "🍗 *Proteins & Sides*", "Choose Protein", listItems);
   } else if (msg === '2') {
     const userSnap = await db.ref(`users/${from}`).once('value');
     await showCartSummary(from, userSnap.val().cart, twiml);
   } else {
-    twiml.message("Reply 1 or 2.");
+    twiml.message("Invalid selection.");
   }
 }
 
@@ -407,9 +467,12 @@ async function handleProteinSelect(from, id, twiml) {
 
   if (item.reg === item.ext) {
     await db.ref(`users/${from}/step`).set('protein_qty');
-    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many pieces?`);
+    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many pieces? (Reply number)`);
   } else {
-    twiml.message(`*${item.name}*\n\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`);
+    sendButtons(twiml, `*${item.name}*`, [
+      { title: `Regular (${formatCurrency(item.reg)})`, id: "1" },
+      { title: `Extra (${formatCurrency(item.ext)})`, id: "2" }
+    ]);
   }
 }
 
@@ -423,7 +486,7 @@ async function handleProteinSize(from, choice, twiml) {
     selected_item_price: item[size],
     selected_size: choice === 1 ? 'Regular' : 'Extra'
   });
-  twiml.message(`*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nHow many pieces?`);
+  twiml.message(`*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nHow many pieces? (Reply number)`);
 }
 
 async function handleProteinQty(from, qty, twiml) {
@@ -443,7 +506,10 @@ async function handleProteinQty(from, qty, twiml) {
   cart.push(newItem);
 
   await db.ref(`users/${from}`).update({ cart: cart, step: 'protein_loop' });
-  twiml.message(`✅ Added ${qty}x ${item.name}.\n\nAdd another protein?\n1. Yes\n2. No (Checkout)`);
+  sendButtons(twiml, `✅ Added ${qty}x ${item.name}.\n\nAdd another protein?`, [
+    { title: "Yes, add more", id: "1" },
+    { title: "No, checkout", id: "2" }
+  ]);
 }
 
 async function showCartSummary(from, cart, twiml) {
@@ -454,14 +520,17 @@ async function showCartSummary(from, cart, twiml) {
     sub += t;
     txt += `${c.name} (${c.size}) x${c.qty} = ${formatCurrency(t)}\n`;
   });
-  txt += `\n💰 Subtotal: ${formatCurrency(sub)}\n\n`;
-  txt += `Do you want to add another meal?\n1. Yes (Add Food)\n2. No (Proceed to Delivery)`;
+  txt += `\n💰 Subtotal: ${formatCurrency(sub)}`;
 
   await db.ref(`users/${from}`).update({
     step: 'add_more_or_checkout',
     cart_subtotal: sub
   });
-  twiml.message(txt);
+  
+  sendButtons(twiml, txt, [
+    { title: "Add Food", id: "1" },
+    { title: "Proceed to Delivery", id: "2" }
+  ]);
 }
 
 // --- ERRAND HANDLERS ---
@@ -569,12 +638,13 @@ async function handlePhoneNumber(from, text, twiml) {
 
   await db.ref(`users/${from}`).update({ final_total: total });
 
-  summary += `\n\nReply "CONFIRM" to proceed to payment.`;
-  twiml.message(summary);
+  sendButtons(twiml, summary, [
+    { title: "CONFIRM ORDER", id: "confirm" }
+  ]);
 }
 
 async function handleFinalConfirm(from, msg, twiml) {
-  if (msg !== 'confirm') return twiml.message("Please type CONFIRM to proceed.");
+  if (msg !== 'confirm') return twiml.message("Please click the CONFIRM button to proceed.");
 
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
