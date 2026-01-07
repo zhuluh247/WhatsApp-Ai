@@ -2,9 +2,9 @@
   "name": "chowzone-bot",
   "version": "1.0.0",
   "description": "ChowZone WhatsApp Bot",
-  "main": "bot.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
