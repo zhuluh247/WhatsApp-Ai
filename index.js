@@ -143,6 +143,29 @@ app.post('/whatsapp', async (req, res) => {
         return res.type('text/xml').send(twiml.toString());
     }
 
+    // --- CHECK ACTIVE ORDER STATUS (BLOCKING STATE) ---
+    // If user has a recent order that is pending or seeking rider, ignore all other inputs
+    const orderId = user.last_order_id;
+    if (orderId) {
+        const orderSnap = await db.ref(`orders/${orderId}`).once('value');
+        const order = orderSnap.val();
+        
+        // Only block if the order is in a "waiting" phase
+        if (order && (order.status === 'pending_payment' || order.status === 'seeking_rider' || order.status === 'rider_accepted')) {
+            let msg = "";
+            if (order.status === 'pending_payment') {
+                msg = "⏳ *Please Wait*\n\nWe are confirming your payment.\n\nDon't reply to this message, you will be updated soon.";
+            } else if (order.status === 'seeking_rider') {
+                msg = "⏳ *Please Wait*\n\nWe are assigning a rider to your order.\n\nDon't reply to this text to avoid mix up. You will be updated shortly.";
+            } else if (order.status === 'rider_accepted') {
+                msg = "⏳ *Rider Assigned*\n\nYour order has been accepted by a rider.\n\nDon't reply here. Contact the rider directly.";
+            }
+
+            twiml.message(msg);
+            return res.type('text/xml').send(twiml.toString());
+        }
+    }
+
     // --- D. ADMIN COMMANDS ---
     if (from === ADMIN_PHONE) {
       if (msg.startsWith('approve ')) {
@@ -536,15 +559,12 @@ async function handleErrandType(from, type, twiml) {
   });
 
   if (isPickup) {
-    // Start Pickup Specific Flow
     await db.ref(`users/${from}/step`).set('pickup_description');
     twiml.message("📝 *Describe the task or pickup details:*\n(e.g., Get a bag of drink at Tarmac)");
   } else if (needsShopping) {
-    // Shopping Flow
     await db.ref(`users/${from}/step`).set('errand_details');
     twiml.message(`📝 *List the items you want to buy.*\n\nFormat: Item Price, Item Price\nExample: Beans 2000, Oil 500`);
   } else {
-    // Fallback (shouldn't be hit with current logic)
     await db.ref(`users/${from}/step`).set('pickup_description');
     twiml.message("📝 *Describe the task:*");
   }
@@ -638,7 +658,6 @@ async function handleCustomerPhone(from, text, twiml) {
     if (user.order_type === 'food') {
         twiml.message(`📍 *Where is the Pickup Location?*\n\n1. ${VENDOR_NAME} (Default)\n2. Type a different address\n\nReply 1 or 2.`);
     } else {
-        // Errand/Pickup Flow - Use specific examples requested
         twiml.message("📍 *Where is the Pickup Location?*\n\n(e.g. Tarmac, School Road, Westend, Safari)");
     }
 }
@@ -676,17 +695,14 @@ async function generateOrderSummary(from, twiml) {
     let total = 0;
     let summary = `🧾 *ORDER SUMMARY*\n\n`;
 
-    // Customer Details
     summary += `👤 Name: ${user.customer_name}\n`;
     summary += `📞 Phone: ${user.customer_phone}\n\n`;
 
-    // Vendor/Source Details (If Pickup)
     if (user.vendor_name) {
         summary += `🏪 Pickup From: ${user.vendor_name}\n`;
         summary += `📞 Vendor Phone: ${user.vendor_phone}\n\n`;
     }
 
-    // Order Content
     if (user.order_type === 'food') {
         total = user.cart_subtotal || 0;
         user.cart.forEach(c => {
@@ -759,7 +775,6 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
     delivery_loc: user.delivery_location,
     pickup_loc: user.pickup_location,
     details: orderDetails,
-    // Add Vendor Info if exists
     vendor_name: user.vendor_name || null,
     vendor_phone: user.vendor_phone || null,
     timestamp: admin.database.ServerValue.TIMESTAMP
