@@ -34,7 +34,7 @@ const ADMIN_PHONE = process.env.ADMIN_PHONE;
 const RIDER_REG_CODE = process.env.RIDER_REG_CODE;
 const DELIVERY_FEE = parseInt(process.env.DELIVERY_FEE) || 500;
 const SHOPPING_FEE = parseInt(process.env.SHOPPING_FEE) || 500;
-const SUPPORT_PHONE = "+2349138765380"; // Manual Support Number
+const SUPPORT_PHONE = "+2349138765380"; 
 
 // --- 4. MENU DATA (Bissy Joy Eatery) ---
 const VENDOR_NAME = "Bissy Joy Eatery";
@@ -103,7 +103,7 @@ app.post('/whatsapp', async (req, res) => {
     if (numMedia > 0) {
       const userSnap = await db.ref(`users/${from}`).once('value');
       const user = userSnap.val();
-      const mediaUrl = req.body.MediaUrl0; // Capture the image URL
+      const mediaUrl = req.body.MediaUrl0; 
       
       if (user && user.step === 'awaiting_payment') {
         await createOrderInDB(from, user, twiml, mediaUrl);
@@ -228,7 +228,6 @@ app.post('/whatsapp', async (req, res) => {
         if (msg === '1') {
            await showCategories(from, twiml); 
         } else if (msg === '2') {
-           // FIX: Set state and ask question, don't call handler directly
            await db.ref(`users/${from}`).update({ step: 'customer_name' });
            twiml.message("📝 Please provide your Full Name.");
         } else {
@@ -241,6 +240,17 @@ app.post('/whatsapp', async (req, res) => {
       case 'errand_details':
         await handleErrandDetails(from, originalMsg, twiml);
         break;
+      // --- NEW PICKUP FLOW STEPS ---
+      case 'pickup_description':
+        await handlePickupDescription(from, originalMsg, twiml);
+        break;
+      case 'vendor_name':
+        await handleVendorName(from, originalMsg, twiml);
+        break;
+      case 'vendor_phone':
+        await handleVendorPhone(from, originalMsg, twiml);
+        break;
+      // -----------------------------
       case 'customer_name':
         await handleCustomerName(from, originalMsg, twiml);
         break;
@@ -506,28 +516,37 @@ async function showCartSummary(from, cart, twiml) {
   twiml.message(txt);
 }
 
-// --- ERRAND HANDLERS ---
+// --- ERRAND & PICKUP HANDLERS ---
 
 async function handleErrandType(from, type, twiml) {
   let typeStr = "";
   let needsShopping = false;
+  let isPickup = false;
   
   if (type === 1) { typeStr = "MARKET"; needsShopping = true; }
-  else if (type === 2) { typeStr = "PICK_UP"; }
+  else if (type === 2) { typeStr = "PICK_UP"; isPickup = true; }
   else if (type === 3) { typeStr = "PHARMACY"; needsShopping = true; }
-  else if (type === 4) { typeStr = "TASK"; }
+  else if (type === 4) { typeStr = "TASK"; isPickup = true; }
   else return twiml.message("Invalid selection.");
 
   await db.ref(`users/${from}`).update({
-    step: needsShopping ? 'errand_details' : 'customer_name',
     errand_type: typeStr,
-    needs_shopping: needsShopping
+    needs_shopping: needsShopping,
+    is_pickup: isPickup
   });
 
-  if (needsShopping) {
+  if (isPickup) {
+    // Start Pickup Specific Flow
+    await db.ref(`users/${from}/step`).set('pickup_description');
+    twiml.message("📝 *Describe the task or pickup details:*\n(e.g., Get a bag of drink at Tarmac)");
+  } else if (needsShopping) {
+    // Shopping Flow
+    await db.ref(`users/${from}/step`).set('errand_details');
     twiml.message(`📝 *List the items you want to buy.*\n\nFormat: Item Price, Item Price\nExample: Beans 2000, Oil 500`);
   } else {
-    twiml.message(`📝 *Describe the task or pickup details:*`);
+    // Fallback (shouldn't be hit with current logic)
+    await db.ref(`users/${from}/step`).set('pickup_description');
+    twiml.message("📝 *Describe the task:*");
   }
 }
 
@@ -553,8 +572,7 @@ async function handleErrandDetails(from, text, twiml) {
   await db.ref(`users/${from}`).update({
     step: 'customer_name',
     errand_items: items,
-    shopping_budget: budget,
-    errand_description: null
+    shopping_budget: budget
   });
 
   let msg = `✅ Items saved:\n`;
@@ -563,21 +581,46 @@ async function handleErrandDetails(from, text, twiml) {
   twiml.message(msg);
 }
 
-// --- NEW CHECKOUT FLOW HANDLERS ---
+// --- NEW PICKUP FLOW FUNCTIONS ---
+
+async function handlePickupDescription(from, text, twiml) {
+    if (!text || text.trim().length === 0) return twiml.message("⚠️ Description cannot be empty.");
+    await db.ref(`users/${from}`).update({
+        step: 'vendor_name',
+        errand_description: text
+    });
+    twiml.message("👤 *Who are we picking from?*\n\nPlease provide the Name of the person or shop.");
+}
+
+async function handleVendorName(from, text, twiml) {
+    if (!text || text.trim().length === 0) return twiml.message("⚠️ Name cannot be empty.");
+    await db.ref(`users/${from}`).update({
+        step: 'vendor_phone',
+        vendor_name: text
+    });
+    twiml.message("📞 *What is their Phone Number?*\n(We need to contact them).");
+}
+
+async function handleVendorPhone(from, text, twiml) {
+    const cleanPhone = text.replace(/\D/g,'');
+    if (cleanPhone.length < 10) return twiml.message("⚠️ Invalid phone number.");
+    
+    await db.ref(`users/${from}`).update({
+        step: 'customer_name',
+        vendor_phone: cleanPhone
+    });
+    twiml.message("👤 *What is YOUR Name?* (Customer Name)");
+}
+
+// --- GENERAL CHECKOUT FLOW HANDLERS ---
 
 async function handleCustomerName(from, text, twiml) {
-    // Logic fix: If text is empty (from Errand flow without details), we might be coming from an error state.
-    // But usually, we arrive here from 'add_more_or_checkout' or 'errand_details'.
-    // We must validate that text is NOT empty.
-    if (!text || text.trim().length === 0) {
-        return twiml.message("⚠️ Name cannot be empty. Please type your name.");
-    }
-
+    if (!text || text.trim().length === 0) return twiml.message("⚠️ Name cannot be empty.");
     await db.ref(`users/${from}`).update({
         step: 'customer_phone',
         customer_name: text
     });
-    twiml.message("📞 Please share your Phone Number (e.g. 08012345678).");
+    twiml.message("📞 Please share YOUR Phone Number (e.g. 08012345678).");
 }
 
 async function handleCustomerPhone(from, text, twiml) {
@@ -595,7 +638,8 @@ async function handleCustomerPhone(from, text, twiml) {
     if (user.order_type === 'food') {
         twiml.message(`📍 *Where is the Pickup Location?*\n\n1. ${VENDOR_NAME} (Default)\n2. Type a different address\n\nReply 1 or 2.`);
     } else {
-        twiml.message("📍 Where is the Pickup Location? (Market, Pharmacy, Person's House, etc)");
+        // Errand/Pickup Flow - Use specific examples requested
+        twiml.message("📍 *Where is the Pickup Location?*\n\n(e.g. Tarmac, School Road, Westend, Safari)");
     }
 }
 
@@ -635,6 +679,12 @@ async function generateOrderSummary(from, twiml) {
     // Customer Details
     summary += `👤 Name: ${user.customer_name}\n`;
     summary += `📞 Phone: ${user.customer_phone}\n\n`;
+
+    // Vendor/Source Details (If Pickup)
+    if (user.vendor_name) {
+        summary += `🏪 Pickup From: ${user.vendor_name}\n`;
+        summary += `📞 Vendor Phone: ${user.vendor_phone}\n\n`;
+    }
 
     // Order Content
     if (user.order_type === 'food') {
@@ -709,12 +759,14 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
     delivery_loc: user.delivery_location,
     pickup_loc: user.pickup_location,
     details: orderDetails,
+    // Add Vendor Info if exists
+    vendor_name: user.vendor_name || null,
+    vendor_phone: user.vendor_phone || null,
     timestamp: admin.database.ServerValue.TIMESTAMP
   };
 
   await db.ref(`orders/${orderId}`).set(orderData);
   
-  // Store Order ID in user session for rating later
   await db.ref(`users/${from}`).update({ 
       step: 'new',
       last_order_id: orderId 
@@ -741,6 +793,11 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
       }
     }
 
+    let vendorInfo = "";
+    if (user.vendor_name) {
+        vendorInfo = `\n🏪 Vendor: ${user.vendor_name}\n📞 Vendor Phone: ${user.vendor_phone}\n`;
+    }
+
     const adminMsg = `💳 *NEW PAYMENT ALERT*\n\n` +
                     `Order ID: #${orderId}\n` +
                     `Type: ${user.order_type.toUpperCase()}\n` +
@@ -749,9 +806,10 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
                     `Pickup: ${user.pickup_location}\n` +
                     `Delivery: ${user.delivery_location}\n` +
                     `Total: ${formatCurrency(total)}\n\n` +
-                    `Items:\n${itemsList}`;
+                    `Items:\n${itemsList}` +
+                    `${vendorInfo}` +
+                    `\n[Check WhatsApp for Screenshot]`;
 
-    // FIX: Send Image if it exists
     const messageOptions = {
       from: process.env.TWILIO_PHONE_NUMBER,
       to: adminPhone,
@@ -849,7 +907,6 @@ async function updateOrderStatus(orderId, status, twiml, from) {
   if (status === 'delivered') {
     const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
     
-    // Trigger Rating Flow for Customer
     await db.ref(`users/${order.customer}`).update({ step: 'rate_rider' });
     
     await client.messages.create({
@@ -868,14 +925,10 @@ async function handleRateRider(from, msg, twiml) {
     if (isNaN(rating) || rating < 1 || rating > 5) {
         return twiml.message("Please enter a number between 1 and 5.");
     }
-
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
     const orderId = user.last_order_id;
-
-    // Save rating to DB
     await db.ref(`orders/${orderId}/rating/rider`).set(rating);
-
     await db.ref(`users/${from}`).update({ step: 'rate_service' });
     twiml.message(`Thanks! How would you rate ChowZone service? (1-5 stars)`);
 }
@@ -885,18 +938,13 @@ async function handleRateService(from, msg, twiml) {
     if (isNaN(rating) || rating < 1 || rating > 5) {
         return twiml.message("Please enter a number between 1 and 5.");
     }
-
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
     const orderId = user.last_order_id;
-
-    // Save rating to DB
     await db.ref(`orders/${orderId}/rating/service`).set(rating);
-
     await db.ref(`users/${from}`).update({ step: 'new' });
     twiml.message(`Thank you for your feedback! We hope to see you again soon. 🍽️`);
 }
-
 
 async function broadcastToRiders(orderId, order) {
   const ridersSnap = await db.ref('riders').orderByChild('status').equalTo('on_duty').once('value');
@@ -915,6 +963,11 @@ async function broadcastToRiders(orderId, order) {
   let msg = `🛵 NEW JOB #${orderId}\n`;
   msg += `Customer: ${order.customer_name}\n`;
   msg += `Phone: ${order.customer_phone}\n`;
+  
+  if (order.vendor_name) {
+      msg += `Picking from: ${order.vendor_name} (${order.vendor_phone})\n`;
+  }
+  
   msg += `Pickup: ${order.pickup_loc}\n`;
   msg += `Dropoff: ${order.delivery_loc}\n`;
   msg += `Items: ${itemsSummary}\n`;
