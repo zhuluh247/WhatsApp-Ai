@@ -37,6 +37,7 @@ const SHOPPING_FEE = parseInt(process.env.SHOPPING_FEE) || 500;
 
 // --- 4. MENU DATA (Bissy Joy Eatery) ---
 const VENDOR_NAME = "Bissy Joy Eatery";
+const VENDOR_ADDRESS = "Bissy Joy Eatery Kitchen"; // Default address for food pickup
 const MENU_CATEGORIES = {
   "RICE_MEALS": [
     { id: 1, name: "White Rice", reg: 2500, ext: 3000 },
@@ -128,6 +129,12 @@ app.post('/whatsapp', async (req, res) => {
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val() || { step: 'new' };
 
+    // --- GLOBAL CANCEL COMMAND ---
+    if ((msg === 'cancel' || msg === '0') && user.step !== 'main_menu' && user.step !== 'new') {
+        await resetUser(from, twiml);
+        return res.type('text/xml').send(twiml.toString());
+    }
+
     // --- C. ADMIN COMMANDS ---
     if (from === ADMIN_PHONE) {
       if (msg.startsWith('approve ')) {
@@ -171,7 +178,7 @@ app.post('/whatsapp', async (req, res) => {
     }
 
     // --- E. CUSTOMER FLOW STATE MACHINE ---
-    if (msg === 'hi' || msg === 'menu' || msg === '0') {
+    if (msg === 'hi' || msg === 'menu' || msg === 'start') {
       await resetUser(from, twiml);
       return res.type('text/xml').send(twiml.toString());
     }
@@ -183,7 +190,7 @@ app.post('/whatsapp', async (req, res) => {
         break;
       case 'vendor_select':
         if (msg === '1') await showCategories(from, twiml);
-        else twiml.message("Invalid option.");
+        else twiml.message("Invalid option. Reply 1.");
         break;
       case 'category_select':
         await handleCategorySelect(from, parseInt(msg), twiml);
@@ -195,7 +202,7 @@ app.post('/whatsapp', async (req, res) => {
         await handleSizeSelect(from, msg, twiml);
         break;
       case 'quantity_select':
-        await handleQuantitySelect(from, parseInt(msg), twiml);
+        await handleQuantitySelect(from, msg, twiml); // Pass string to validate
         break;
       case 'protein_loop':
         await handleProteinLoop(from, msg, twiml);
@@ -207,13 +214,13 @@ app.post('/whatsapp', async (req, res) => {
         await handleProteinSize(from, msg, twiml);
         break;
       case 'protein_qty':
-        await handleProteinQty(from, parseInt(msg), twiml);
+        await handleProteinQty(from, msg, twiml);
         break;
       case 'add_more_or_checkout':
         if (msg === '1') {
            await showCategories(from, twiml); 
         } else if (msg === '2') {
-           await handleDeliveryLocation(from, "", twiml); 
+           await handleCustomerName(from, "", twiml); // Start new checkout flow
         } else {
            twiml.message("Reply 1 or 2.");
         }
@@ -224,20 +231,23 @@ app.post('/whatsapp', async (req, res) => {
       case 'errand_details':
         await handleErrandDetails(from, originalMsg, twiml);
         break;
-      case 'errand_location':
-        await handleErrandLocation(from, originalMsg, twiml);
+      case 'customer_name':
+        await handleCustomerName(from, originalMsg, twiml);
+        break;
+      case 'customer_phone':
+        await handleCustomerPhone(from, originalMsg, twiml);
+        break;
+      case 'pickup_location':
+        await handlePickupLocation(from, originalMsg, twiml);
         break;
       case 'delivery_location':
         await handleDeliveryLocation(from, originalMsg, twiml);
-        break;
-      case 'phone_number':
-        await handlePhoneNumber(from, originalMsg, twiml);
         break;
       case 'confirm_order':
         await handleFinalConfirm(from, msg, twiml);
         break;
       default:
-        twiml.message("I didn't understand that. Reply 'Menu'.");
+        twiml.message("I didn't understand that. Reply 'Menu' to restart.");
     }
 
     res.type('text/xml').send(twiml.toString());
@@ -258,7 +268,7 @@ async function resetUser(from, twiml) {
     order_type: null,
     errand_data: {}
   });
-  const welcomeMsg = `🍽️ *Welcome to ChowZone!*\n\nHow can we help you today?\n\n1. Order Food\n2. Errands (Market/Pharmacy/Pickup)\n\nReply with number 1 or 2.`;
+  const welcomeMsg = `🍽️ *Welcome to ChowZone!*\n\nHow can we help you today?\n\n1. Order Food\n2. Errands (Market/Pharmacy/Pickup)\n\nReply with number 1 or 2.\n(Text 'Cancel' anytime to restart)`;
   twiml.message(welcomeMsg);
 }
 
@@ -276,7 +286,7 @@ async function handleMainMenu(from, msg, twiml) {
     });
     twiml.message(`🏃 *Select Errand Type*\n\n1. 🛒 Market Shopping\n2. 📦 Pick Up Item\n3. 💊 Pharmacy / Supermarket\n4. 📝 Campus Task\n\nReply with number.`);
   } else {
-    twiml.message("Invalid option.");
+    twiml.message("Invalid option. Reply 1 or 2.");
   }
 }
 
@@ -293,7 +303,7 @@ async function handleCategorySelect(from, choice, twiml) {
   if (choice === 2) categoryKey = 'SWALLOWS';
   if (choice === 3) categoryKey = 'PROTEINS';
 
-  if (!categoryKey) return twiml.message("Invalid category.");
+  if (!categoryKey) return twiml.message("Invalid category. Reply 1, 2, or 3.");
 
   await db.ref(`users/${from}`).update({
     step: 'item_select',
@@ -324,29 +334,42 @@ async function handleItemSelect(from, id, twiml) {
 
   if (item.reg === item.ext) {
     await db.ref(`users/${from}/step`).set('quantity_select');
-    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many?`);
+    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many? (Enter number)`);
   } else {
     let msg = `*${item.name}*\n\nSelect Portion:\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`;
     twiml.message(msg);
   }
 }
 
-async function handleSizeSelect(from, choice, twiml) {
+async function handleSizeSelect(from, msg, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const item = userSnap.val().selected_item;
-  const size = choice === 1 ? 'reg' : 'ext';
+  
+  // Fix Bug: Strict check for '1' and '2'
+  if (msg !== '1' && msg !== '2') {
+      return twiml.message("Invalid choice. Reply 1 for Regular or 2 for Extra.");
+  }
+
+  const size = msg === '1' ? 'reg' : 'ext';
   const price = item[size];
+  const label = msg === '1' ? 'Regular' : 'Extra';
 
   await db.ref(`users/${from}`).update({
     step: 'quantity_select',
     selected_item_price: price,
-    selected_size: choice === 1 ? 'Regular' : 'Extra'
+    selected_size: label
   });
 
-  twiml.message(`*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nPrice: ${formatCurrency(price)}\n\nHow many?`);
+  twiml.message(`*${item.name} (${label})*\n\nPrice: ${formatCurrency(price)}\n\nHow many? (Enter number)`);
 }
 
-async function handleQuantitySelect(from, qty, twiml) {
+async function handleQuantitySelect(from, msg, twiml) {
+  // Input Validation
+  const qty = parseInt(msg);
+  if (isNaN(qty) || qty <= 0) {
+    return twiml.message("⚠️ Please enter a valid number (e.g., 2).");
+  }
+
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
   const item = userSnap.val().selected_item;
@@ -413,20 +436,25 @@ async function handleProteinSelect(from, id, twiml) {
   }
 }
 
-async function handleProteinSize(from, choice, twiml) {
+async function handleProteinSize(from, msg, twiml) {
+  if (msg !== '1' && msg !== '2') return twiml.message("Reply 1 or 2.");
+
   const userSnap = await db.ref(`users/${from}`).once('value');
   const item = userSnap.val().selected_item;
-  const size = choice === 1 ? 'reg' : 'ext';
+  const size = msg === '1' ? 'reg' : 'ext';
   
   await db.ref(`users/${from}`).update({
     step: 'protein_qty',
     selected_item_price: item[size],
-    selected_size: choice === 1 ? 'Regular' : 'Extra'
+    selected_size: msg === '1' ? 'Regular' : 'Extra'
   });
-  twiml.message(`*${item.name} (${choice === 1 ? 'Regular' : 'Extra'})*\n\nHow many pieces?`);
+  twiml.message(`*${item.name} (${msg === '1' ? 'Regular' : 'Extra'})*\n\nHow many pieces?`);
 }
 
-async function handleProteinQty(from, qty, twiml) {
+async function handleProteinQty(from, msg, twiml) {
+    const qty = parseInt(msg);
+    if (isNaN(qty) || qty <= 0) return twiml.message("⚠️ Please enter a valid number.");
+
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
   const item = userSnap.val().selected_item;
@@ -474,10 +502,10 @@ async function handleErrandType(from, type, twiml) {
   else if (type === 2) { typeStr = "PICK_UP"; }
   else if (type === 3) { typeStr = "PHARMACY"; needsShopping = true; }
   else if (type === 4) { typeStr = "TASK"; }
-  else return twiml.message("Invalid.");
+  else return twiml.message("Invalid selection.");
 
   await db.ref(`users/${from}`).update({
-    step: needsShopping ? 'errand_details' : 'errand_location', 
+    step: needsShopping ? 'errand_details' : 'customer_name', // Skip details if pickup/task, go to name
     errand_type: typeStr,
     needs_shopping: needsShopping
   });
@@ -485,7 +513,7 @@ async function handleErrandType(from, type, twiml) {
   if (needsShopping) {
     twiml.message(`📝 *List the items you want to buy.*\n\nFormat: Item Price, Item Price\nExample: Beans 2000, Oil 500`);
   } else {
-    twiml.message(`📝 *Describe the task or pickup:*`);
+    twiml.message(`📝 *Describe the task or pickup details:*`);
   }
 }
 
@@ -509,68 +537,132 @@ async function handleErrandDetails(from, text, twiml) {
   if (items.length === 0) return twiml.message("⚠️ Could not read prices. Example: 'Beans 2000'");
 
   await db.ref(`users/${from}`).update({
-    step: 'errand_location',
+    step: 'customer_name', // Go to Name step next
     errand_items: items,
-    shopping_budget: budget
+    shopping_budget: budget,
+    errand_description: null
   });
 
   let msg = `✅ Items saved:\n`;
   items.forEach(i => msg += `- ${i.name}: ${formatCurrency(i.price)}\n`);
-  msg += `\nTotal Items Cost: ${formatCurrency(budget)}\n\n📍 Where is the pickup location?`;
+  msg += `\nTotal Items Cost: ${formatCurrency(budget)}\n\n📝 Next, please provide your Name.`;
   twiml.message(msg);
 }
 
-async function handleErrandLocation(from, text, twiml) {
-  await db.ref(`users/${from}`).update({
-    step: 'delivery_location',
-    pickup_location: text
-  });
-  twiml.message("📍 Where should the rider drop the items? (Your Hostel/Room)");
+// --- NEW CHECKOUT FLOW HANDLERS ---
+
+async function handleCustomerName(from, text, twiml) {
+    // If text is empty, it means we are asking for the first time.
+    // But if we came from Errands (Pickup/Task) where we didn't save items, text is the description.
+    const userSnap = await db.ref(`users/${from}`).once('value');
+    const user = userSnap.val();
+    
+    if (user.order_type === 'errand' && !user.errand_items && text !== "") {
+        // Save the description for pickup/task
+        await db.ref(`users/${from}`).update({
+            errand_description: text
+        });
+    }
+
+    await db.ref(`users/${from}`).update({
+        step: 'customer_phone',
+        customer_name: text
+    });
+    twiml.message("📞 Please share your Phone Number (e.g. 08012345678).");
+}
+
+async function handleCustomerPhone(from, text, twiml) {
+    // Basic validation (check if mostly digits)
+    const cleanPhone = text.replace(/\D/g,'');
+    if (cleanPhone.length < 10) return twiml.message("⚠️ Invalid phone number. Please enter a valid number.");
+
+    await db.ref(`users/${from}`).update({
+        step: 'pickup_location',
+        customer_phone: cleanPhone
+    });
+
+    // If Food, give option for default Vendor address
+    const userSnap = await db.ref(`users/${from}`).once('value');
+    const user = userSnap.val();
+
+    if (user.order_type === 'food') {
+        twiml.message(`📍 *Where is the Pickup Location?*\n\n1. ${VENDOR_NAME} (Default)\n2. Type a different address\n\nReply 1 or 2.`);
+    } else {
+        twiml.message("📍 Where is the Pickup Location? (Market, Pharmacy, Person's House, etc)");
+    }
+}
+
+async function handlePickupLocation(from, text, twiml) {
+    const userSnap = await db.ref(`users/${from}`).once('value');
+    const user = userSnap.val();
+    let location = text;
+
+    if (user.order_type === 'food' && text.trim() === '1') {
+        location = VENDOR_ADDRESS;
+    } else if (user.order_type === 'food' && text.trim() === '2') {
+        await db.ref(`users/${from}/step`).set('pickup_location_manual');
+        return twiml.message("📍 Please type the specific pickup address:");
+    }
+
+    await db.ref(`users/${from}`).update({
+        step: 'delivery_location',
+        pickup_location: location
+    });
+    twiml.message("📍 Where should the rider drop the items? (Your Hostel/Room/Address)");
 }
 
 async function handleDeliveryLocation(from, text, twiml) {
-  await db.ref(`users/${from}`).update({
-    step: 'phone_number',
-    delivery_location: text
-  });
-  twiml.message("📞 Please share your Phone Number for the rider.");
+    await db.ref(`users/${from}`).update({
+        step: 'confirm_order',
+        delivery_location: text
+    });
+    await generateOrderSummary(from, twiml);
 }
 
-async function handlePhoneNumber(from, text, twiml) {
-  await db.ref(`users/${from}`).update({
-    phone: text,
-    step: 'confirm_order'
-  });
+async function generateOrderSummary(from, twiml) {
+    const userSnap = await db.ref(`users/${from}`).once('value');
+    const user = userSnap.val();
+    let total = 0;
+    let summary = `🧾 *ORDER SUMMARY*\n\n`;
 
-  const userSnap = await db.ref(`users/${from}`).once('value');
-  const user = userSnap.val();
-  let total = 0;
-  let summary = `🧾 *ORDER SUMMARY*\n\n`;
+    // Customer Details
+    summary += `👤 Name: ${user.customer_name}\n`;
+    summary += `📞 Phone: ${user.customer_phone}\n\n`;
 
-  if (user.order_type === 'food') {
-    total = user.cart_subtotal || 0;
-    user.cart.forEach(c => {
-      summary += `${c.name} (${c.size}) x${c.qty}\n`;
-    });
-    summary += `\nFood Cost: ${formatCurrency(total)}`;
-  } else {
-    total = user.shopping_budget || 0;
-    summary += `Items: ${formatCurrency(total)}\n`;
-    
-    if (user.needs_shopping) summary += `Shopping Fee: ${formatCurrency(SHOPPING_FEE)}\n`;
-    else summary += `Service Fee: ${formatCurrency(SHOPPING_FEE)}\n`;
-    
-    total += SHOPPING_FEE;
-  }
+    // Order Content
+    if (user.order_type === 'food') {
+        total = user.cart_subtotal || 0;
+        user.cart.forEach(c => {
+            summary += `${c.name} (${c.size}) x${c.qty}\n`;
+        });
+        summary += `\nFood Cost: ${formatCurrency(total)}`;
+    } else {
+        // Errand
+        if (user.errand_items && user.errand_items.length > 0) {
+            total = user.shopping_budget || 0;
+            summary += `Items:\n`;
+            user.errand_items.forEach(i => summary += `- ${i.name}\n`);
+            summary += `\nItems Cost: ${formatCurrency(total)}`;
+            if (user.needs_shopping) summary += `\nShopping Fee: ${formatCurrency(SHOPPING_FEE)}`;
+            total += SHOPPING_FEE;
+        } else {
+            // Pickup or Task (No shopping list)
+            summary += `Task/Details: ${user.errand_description}\n`;
+            total = SHOPPING_FEE; // Base service fee
+            summary += `\nService Fee: ${formatCurrency(SHOPPING_FEE)}`;
+        }
+    }
 
-  total += DELIVERY_FEE;
-  summary += `\nDelivery Fee: ${formatCurrency(DELIVERY_FEE)}`;
-  summary += `\n━━━━━━━━━━━\n💰 *TOTAL: ${formatCurrency(total)}*`;
+    total += DELIVERY_FEE;
+    summary += `\n📍 Pickup: ${user.pickup_location}`;
+    summary += `\n🏠 Delivery: ${user.delivery_location}`;
+    summary += `\n🚚 Delivery Fee: ${formatCurrency(DELIVERY_FEE)}`;
+    summary += `\n━━━━━━━━━━━\n💰 *TOTAL: ${formatCurrency(total)}*`;
 
-  await db.ref(`users/${from}`).update({ final_total: total });
+    await db.ref(`users/${from}`).update({ final_total: total });
 
-  summary += `\n\nReply "CONFIRM" to proceed to payment.`;
-  twiml.message(summary);
+    summary += `\n\nReply "CONFIRM" to proceed to payment.`;
+    twiml.message(summary);
 }
 
 async function handleFinalConfirm(from, msg, twiml) {
@@ -591,17 +683,29 @@ async function handleFinalConfirm(from, msg, twiml) {
 async function createOrderInDB(from, user, twiml) {
   const orderId = generateId();
   const total = user.final_total;
+  
+  // Bug Fix: Handle details for PickUp/Task orders where errand_items is undefined
+  let orderDetails = [];
+  if (user.order_type === 'food') {
+      orderDetails = user.cart;
+  } else if (user.errand_items) {
+      orderDetails = user.errand_items;
+  } else {
+      // Fallback for Pickup/Task - create a dummy object for display
+      orderDetails = [{ name: user.errand_description || "Errand Task", price: 0 }];
+  }
 
   const orderData = {
     id: orderId,
     customer: from,
-    customer_phone: user.phone,
+    customer_name: user.customer_name,
+    customer_phone: user.customer_phone,
     type: user.order_type,
     status: 'pending_payment',
     total: total,
     delivery_loc: user.delivery_location,
-    pickup_loc: user.pickup_location || VENDOR_NAME,
-    details: user.order_type === 'food' ? user.cart : user.errand_items,
+    pickup_loc: user.pickup_location,
+    details: orderDetails, // This is now always an array
     timestamp: admin.database.ServerValue.TIMESTAMP
   };
 
@@ -610,7 +714,7 @@ async function createOrderInDB(from, user, twiml) {
 
   twiml.message(`✅ *Order Received!*\n\nYour Order #${orderId} is worth ${formatCurrency(total)}.\n\nWe are verifying your payment now. You will be notified shortly.`);
 
-  // Notify Admin (Wrapped in try/catch)
+  // Notify Admin
   try {
     const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
     
@@ -621,12 +725,26 @@ async function createOrderInDB(from, user, twiml) {
 
     let itemsList = "";
     if (user.order_type === 'food') {
-      user.cart.forEach(c => itemsList += `- ${c.name} x${c.qty}\n`);
+      user.cart.forEach(c => itemsList += `- ${c.name} (${c.size}) x${c.qty}\n`);
     } else {
-      user.errand_items.forEach(i => itemsList += `- ${i.name}\n`);
+      if (user.errand_items) {
+          user.errand_items.forEach(i => itemsList += `- ${i.name}\n`);
+      } else {
+          itemsList += `- ${user.errand_description}\n`;
+      }
     }
 
-    const adminMsg = `💳 *NEW PAYMENT ALERT*\n\nOrder ID: #${orderId}\nCustomer: ${user.phone}\nTotal: ${formatCurrency(total)}\nItems:\n${itemsList}\n\n[Check WhatsApp for Screenshot]`;
+    // IMPROVED: Full details sent to admin
+    const adminMsg = `💳 *NEW PAYMENT ALERT*\n\n` +
+                    `Order ID: #${orderId}\n` +
+                    `Type: ${user.order_type.toUpperCase()}\n` +
+                    `Customer: ${user.customer_name}\n` +
+                    `Phone: ${user.customer_phone}\n` +
+                    `Pickup: ${user.pickup_location}\n` +
+                    `Delivery: ${user.delivery_location}\n` +
+                    `Total: ${formatCurrency(total)}\n\n` +
+                    `Items:\n${itemsList}\n\n` +
+                    `[Check WhatsApp for Screenshot]`;
 
     await client.messages.create({
       from: process.env.TWILIO_PHONE_NUMBER,
@@ -647,7 +765,7 @@ async function approveOrder(orderId) {
   
   const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   
-  // Notify Customer: Simplified
+  // Notify Customer
   await client.messages.create({
     from: process.env.TWILIO_PHONE_NUMBER,
     to: order.customer,
@@ -685,14 +803,20 @@ async function acceptOrder(riderPhone, orderId, twiml) {
 
   await db.ref(`orders/${orderId}`).update({
     status: 'rider_accepted',
-    rider_phone: riderPhone
+    rider_phone: riderPhone,
+    rider_name: rider.name
   });
 
-  twiml.message(`✅ You have accepted Order #${orderId}. Connect with Admin directly.`);
+  twiml.message(`✅ You have accepted Order #${orderId}. Wait for Admin to contact you regarding payment details.`);
 
-  // Notify Admin (Provide Rider Info)
   const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  const adminMsg = `🛵 *RIDER ACCEPTED*\n\nOrder #${orderId}\nRider: ${rider.name}\nPhone: ${riderPhone}\n\nPlease chat with rider to arrange details.`;
+
+  // 1. Notify Admin (Rider details for Manual Payment)
+  const adminMsg = `🛵 *RIDER ACCEPTED JOB*\n\n` +
+                  `Order #${orderId}\n` +
+                  `Rider Name: ${rider.name}\n` +
+                  `Rider Phone: ${riderPhone}\n\n` +
+                  `Please contact rider to arrange details and send the order payment to his account manually.`;
 
   await client.messages.create({
     from: process.env.TWILIO_PHONE_NUMBER,
@@ -700,7 +824,7 @@ async function acceptOrder(riderPhone, orderId, twiml) {
     body: adminMsg
   });
 
-  // Notify Customer (Provide Rider Phone)
+  // 2. Notify Customer (Provide Rider Phone)
   await client.messages.create({
     from: process.env.TWILIO_PHONE_NUMBER,
     to: order.customer,
@@ -733,13 +857,25 @@ async function broadcastToRiders(orderId, order) {
   
   const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   
-  // Include Customer Phone in broadcast so rider can call them
+  // Prepare Items Summary
+  let itemsSummary = "";
+  if (order.type === 'food') {
+      order.details.forEach(d => itemsSummary += `${d.name} x${d.qty}, `);
+      itemsSummary = itemsSummary.slice(0, -2); // remove last comma
+  } else {
+      itemsSummary = order.details[0].name; // Task description
+  }
+
+  // IMPROVED: Full details for rider
   let msg = `🛵 NEW JOB #${orderId}\n`;
+  msg += `Customer: ${order.customer_name}\n`;
+  msg += `Phone: ${order.customer_phone}\n`;
   msg += `Pickup: ${order.pickup_loc}\n`;
   msg += `Dropoff: ${order.delivery_loc}\n`;
-  msg += `Customer: ${order.customer_phone}\n`; 
-  msg += `Fee: ${formatCurrency(DELIVERY_FEE)}\n`;
-  msg += `Reply: ACCEPT ${orderId}`;
+  msg += `Items: ${itemsSummary}\n`;
+  msg += `Total Value: ${formatCurrency(order.total)}\n`;
+  msg += `Delivery Fee: ${formatCurrency(DELIVERY_FEE)}\n`;
+  msg += `\nReply: ACCEPT ${orderId}`;
 
   if (riders) {
     Object.keys(riders).forEach(key => {
