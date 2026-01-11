@@ -513,7 +513,7 @@ const VENDORS = {
         { id: 7, name: "Small Chops (Beef)", price: 2500 },
         { id: 8, name: "Doughnuts (Pack of 3)", price: 4500 },
         { id: 9, name: "Doughnuts (Pack of 6)", price: 8500 },
-        { id: 10, name: "Cake Slice", price: 3000 }, // Avg price
+        { id: 10, name: "Cake Slice", price: 3000 },
         { id: 11, name: "Ice Cream Plate (S)", price: 1000 },
         { id: 12, name: "Ice Cream Plate (M)", price: 1500 },
         { id: 13, name: "Ice Cream Plate (L)", price: 2200 }
@@ -564,7 +564,7 @@ const VENDORS = {
         { id: 4, name: "Snail (L)", price: 5000 },
         { id: 5, name: "Ponmo (S)", price: 1500 },
         { id: 6, name: "Ponmo (L)", price: 3000 },
-        { id: 7, name: "Protein & Plantain", price: 6500 } // Avg
+        { id: 7, name: "Protein & Plantain", price: 6500 }
       ]
     }
   },
@@ -623,7 +623,7 @@ const VENDORS = {
     address: "Iya Afusat",
     categories: {
       "MAIN_MEALS": [
-        { id: 1, name: "Rice/Beans/Jollof/Spag/Bread", price: 750 }, // Avg
+        { id: 1, name: "Rice/Beans/Jollof/Spag/Bread", price: 750 },
         { id: 2, name: "Plantain", price: 200 }
       ],
       "SWALLOW": [
@@ -771,16 +771,16 @@ app.post('/whatsapp', async (req, res) => {
         const order = orderSnap.val();
         
         if (order && (order.status === 'pending_payment' || order.status === 'seeking_rider' || order.status === 'rider_accepted')) {
-            let msg = "";
+            let responseMsg = "";
             if (order.status === 'pending_payment') {
-                msg = "⏳ *Please Wait*\n\nWe are confirming your payment.\n\nDon't reply to this message, you will be updated soon.";
+                responseMsg = "⏳ *Please Wait*\n\nWe are confirming your payment.\n\nDon't reply to this message, you will be updated soon.";
             } else if (order.status === 'seeking_rider') {
-                msg = "⏳ *Please Wait*\n\nWe are assigning a rider to your order.\n\nDon't reply to this text to avoid mix up. You will be updated shortly.";
+                responseMsg = "⏳ *Please Wait*\n\nWe are assigning a rider to your order.\n\nDon't reply to this text to avoid mix up. You will be updated shortly.";
             } else if (order.status === 'rider_accepted') {
-                msg = "⏳ *Rider Assigned*\n\nYour order has been accepted by a rider.\n\nDon't reply here. Contact the rider directly.";
+                responseMsg = "⏳ *Rider Assigned*\n\nYour order has been accepted by a rider.\n\nDon't reply here. Contact the rider directly.";
             }
 
-            twiml.message(msg);
+            twiml.message(responseMsg);
             return res.type('text/xml').send(twiml.toString());
         }
     }
@@ -859,29 +859,25 @@ app.post('/whatsapp', async (req, res) => {
         await handleQuantitySelect(from, msg, twiml);
         break;
       case 'protein_loop':
-        // Protein loop logic might need adjustment for vendors without specific protein categories
-        // For now, we treat "Add more items" generally
         await handleAddMoreLoop(from, msg, twiml);
         break;
       case 'protein_select':
-        await handleItemSelect(from, parseInt(msg), twiml); // Reuse item select
+        await handleItemSelect(from, parseInt(msg), twiml);
         break;
       case 'protein_size':
-        await handleSizeSelect(from, msg, twiml); // Reuse size select
+        await handleSizeSelect(from, msg, twiml);
         break;
       case 'protein_qty':
-        await handleQuantitySelect(from, msg, twiml); // Reuse qty select
+        await handleQuantitySelect(from, msg, twiml);
         break;
       case 'add_more_or_checkout':
         if (msg === '1') {
-           // Determine if vendor has categories to go back to, or just item list
            const vKey = user.selected_vendor;
            const vendor = VENDORS[vKey];
            const cats = Object.keys(vendor.categories);
            if(cats.length > 1) {
              await showCategories(from, twiml);
            } else {
-             // If only one category, show items directly
              await db.ref(`users/${from}`).update({ step: 'item_select', current_category: cats[0] });
              await showItems(from, cats[0], twiml);
            }
@@ -958,7 +954,6 @@ async function resetUser(from, twiml) {
 }
 
 async function handleMainMenu(from, msg, twiml) {
-  // 1. Restaurants, 2. Shawarma, 3. Frozen, 4. Pharmacy, 5. Errands
   if (msg === '1') {
     await db.ref(`users/${from}`).update({
       step: 'vendor_group_select',
@@ -1011,8 +1006,7 @@ async function showVendorsInGroup(from, groupKey, twiml) {
 }
 
 async function handleVendorGroupSelect(from, choice, twiml) {
-  const groupKey = VENDOR_GROUPS[from]; // This logic was wrong, fetching from DB
-  // Let's fix: we stored selected_group in DB
+  // FIX: Removed duplicate variable declaration
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
   const groupKey = user.selected_group;
@@ -1029,12 +1023,10 @@ async function handleVendorGroupSelect(from, choice, twiml) {
     selected_vendor: selectedVendorKey
   });
 
-  // Check if vendor has categories
   const vendor = VENDORS[selectedVendorKey];
   const categories = Object.keys(vendor.categories);
 
   if (categories.length === 1 && categories[0] === 'MENU') {
-    // Flat list, skip category selection
     await showItems(from, 'MENU', twiml);
   } else {
     await showCategories(from, twiml);
@@ -1115,15 +1107,13 @@ async function handleItemSelect(from, id, twiml) {
     selected_item: item
   });
 
-  // Check if sizes are needed
   if (item.reg && item.ext && item.reg !== item.ext) {
     let msg = `*${item.name}*\n\nSelect Portion:\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`;
     twiml.message(msg);
   } else {
-    // No size choice, go to quantity
     let price = item.price || item.reg || item.ext;
     let size = "Regular";
-    if (!item.price && !item.reg) price = 0; // Safety
+    if (!item.price && !item.reg) price = 0; 
 
     await db.ref(`users/${from}`).update({
         step: 'quantity_select',
@@ -1178,21 +1168,15 @@ async function handleQuantitySelect(from, msg, twiml) {
   const cart = user.cart || [];
   cart.push(newItem);
 
-  // Logic to check if we should ask for protein/sides specifically?
-  // Since vendors have different structures, we will simplify:
-  // Add to cart -> Ask "Add more items?" or "Checkout"
-
   await db.ref(`users/${from}`).update({ cart: cart });
   await showCartSummary(from, cart, twiml);
 }
 
 async function handleAddMoreLoop(from, msg, twiml) {
-    // Reuse showCartSummary logic logic or simplify
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
     
     if (msg === '1') {
-       // Back to categories or items
        const vKey = user.selected_vendor;
        const vendor = VENDORS[vKey];
        const cats = Object.keys(vendor.categories);
@@ -1369,7 +1353,7 @@ async function handlePickupLocation(from, text, twiml) {
 
 async function handlePickupLocationManual(from, text, twiml) {
     if(!text) return twiml.message("Address required.");
-    await handlePickupLocation(from, text, twiml); // Pass through
+    await handlePickupLocation(from, text, twiml);
 }
 
 async function handleDeliveryLocation(from, text, twiml) {
