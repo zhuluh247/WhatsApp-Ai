@@ -36,7 +36,8 @@ const DELIVERY_FEE = parseInt(process.env.DELIVERY_FEE) || 500;
 const SHOPPING_FEE = parseInt(process.env.SHOPPING_FEE) || 500;
 const SUPPORT_PHONE = "+2349138765380"; 
 
-// --- 4. VENDORS DATA ---
+// --- 4. VENDORS DATA (UPDATED) ---
+// We replaced the single vendor structure with a multi-vendor structure
 const VENDORS = {
   "BISSY_JOY": {
     name: "Bissy Joy Eatery",
@@ -684,7 +685,7 @@ const VENDORS = {
   }
 };
 
-// Helper to map groups to vendor keys
+// Group Vendors for Menu
 const VENDOR_GROUPS = {
   "RESTAURANTS": ["BISSY_JOY", "BIG_MUMMY", "DEEMEALLAB", "SAVORE", "FINEY_PRICES", "OKELE_JOINT", "IYA_AFUSAT", "OPEYEMI_CANTEEN"],
   "SHAWARMA_FAST_FOOD": ["BIGGY_SHACK", "ROYAL_CHAW", "WRAP_STAR", "CHAO_COCINA", "SPAG_CITY", "JAMBLACK_HUBS", "ROYALS_TREAT"],
@@ -765,22 +766,24 @@ app.post('/whatsapp', async (req, res) => {
     }
 
     // --- CHECK ACTIVE ORDER STATUS (BLOCKING STATE) ---
+    // If user has a recent order that is pending or seeking rider, ignore all other inputs
     const orderId = user.last_order_id;
     if (orderId) {
         const orderSnap = await db.ref(`orders/${orderId}`).once('value');
         const order = orderSnap.val();
         
+        // Only block if the order is in a "waiting" phase
         if (order && (order.status === 'pending_payment' || order.status === 'seeking_rider' || order.status === 'rider_accepted')) {
-            let responseMsg = "";
+            let msg = "";
             if (order.status === 'pending_payment') {
-                responseMsg = "⏳ *Please Wait*\n\nWe are confirming your payment.\n\nDon't reply to this message, you will be updated soon.";
+                msg = "⏳ *Please Wait*\n\nWe are confirming your payment.\n\nDon't reply to this message, you will be updated soon.";
             } else if (order.status === 'seeking_rider') {
-                responseMsg = "⏳ *Please Wait*\n\nWe are assigning a rider to your order.\n\nDon't reply to this text to avoid mix up. You will be updated shortly.";
+                msg = "⏳ *Please Wait*\n\nWe are assigning a rider to your order.\n\nDon't reply to this text to avoid mix up. You will be updated shortly.";
             } else if (order.status === 'rider_accepted') {
-                responseMsg = "⏳ *Rider Assigned*\n\nYour order has been accepted by a rider.\n\nDon't reply here. Contact the rider directly.";
+                msg = "⏳ *Rider Assigned*\n\nYour order has been accepted by a rider.\n\nDon't reply here. Contact the rider directly.";
             }
 
-            twiml.message(responseMsg);
+            twiml.message(msg);
             return res.type('text/xml').send(twiml.toString());
         }
     }
@@ -838,14 +841,11 @@ app.post('/whatsapp', async (req, res) => {
       case 'main_menu':
         await handleMainMenu(from, msg, twiml);
         break;
-      // --- NEW VENDOR FLOW ---
-      case 'vendor_group_select':
-        await handleVendorGroupSelect(from, parseInt(msg), twiml);
-        break;
+      // --- NEW VENDOR FLOW STEPS ---
       case 'vendor_select':
         await handleVendorSelect(from, parseInt(msg), twiml);
         break;
-      // -------------------------
+      // ---------------------------------
       case 'category_select':
         await handleCategorySelect(from, msg, twiml);
         break;
@@ -859,28 +859,20 @@ app.post('/whatsapp', async (req, res) => {
         await handleQuantitySelect(from, msg, twiml);
         break;
       case 'protein_loop':
-        await handleAddMoreLoop(from, msg, twiml);
+        await handleProteinLoop(from, msg, twiml);
         break;
       case 'protein_select':
-        await handleItemSelect(from, parseInt(msg), twiml);
+        await handleProteinSelect(from, parseInt(msg), twiml);
         break;
       case 'protein_size':
-        await handleSizeSelect(from, msg, twiml);
+        await handleProteinSize(from, msg, twiml);
         break;
       case 'protein_qty':
-        await handleQuantitySelect(from, msg, twiml);
+        await handleProteinQty(from, msg, twiml);
         break;
       case 'add_more_or_checkout':
         if (msg === '1') {
-           const vKey = user.selected_vendor;
-           const vendor = VENDORS[vKey];
-           const cats = Object.keys(vendor.categories);
-           if(cats.length > 1) {
-             await showCategories(from, twiml);
-           } else {
-             await db.ref(`users/${from}`).update({ step: 'item_select', current_category: cats[0] });
-             await showItems(from, cats[0], twiml);
-           }
+           await showCategories(from, twiml); 
         } else if (msg === '2') {
            await db.ref(`users/${from}`).update({ step: 'customer_name' });
            twiml.message("📝 Please provide your Full Name.");
@@ -894,6 +886,7 @@ app.post('/whatsapp', async (req, res) => {
       case 'errand_details':
         await handleErrandDetails(from, originalMsg, twiml);
         break;
+      // --- NEW PICKUP FLOW STEPS ---
       case 'pickup_description':
         await handlePickupDescription(from, originalMsg, twiml);
         break;
@@ -903,6 +896,7 @@ app.post('/whatsapp', async (req, res) => {
       case 'vendor_phone':
         await handleVendorPhone(from, originalMsg, twiml);
         break;
+      // -----------------------------
       case 'customer_name':
         await handleCustomerName(from, originalMsg, twiml);
         break;
@@ -911,9 +905,6 @@ app.post('/whatsapp', async (req, res) => {
         break;
       case 'pickup_location':
         await handlePickupLocation(from, originalMsg, twiml);
-        break;
-      case 'pickup_location_manual':
-        await handlePickupLocationManual(from, originalMsg, twiml);
         break;
       case 'delivery_location':
         await handleDeliveryLocation(from, originalMsg, twiml);
@@ -954,30 +945,31 @@ async function resetUser(from, twiml) {
 }
 
 async function handleMainMenu(from, msg, twiml) {
+  // 1. Restaurants, 2. Shawarma, 3. Frozen, 4. Pharmacy, 5. Errands
   if (msg === '1') {
     await db.ref(`users/${from}`).update({
-      step: 'vendor_group_select',
+      step: 'vendor_select',
       selected_group: 'RESTAURANTS',
       order_type: 'food'
     });
     await showVendorsInGroup(from, 'RESTAURANTS', twiml);
   } else if (msg === '2') {
     await db.ref(`users/${from}`).update({
-      step: 'vendor_group_select',
+      step: 'vendor_select',
       selected_group: 'SHAWARMA_FAST_FOOD',
       order_type: 'food'
     });
     await showVendorsInGroup(from, 'SHAWARMA_FAST_FOOD', twiml);
   } else if (msg === '3') {
     await db.ref(`users/${from}`).update({
-      step: 'vendor_group_select',
+      step: 'vendor_select',
       selected_group: 'FROZEN_FOODS',
       order_type: 'food'
     });
     await showVendorsInGroup(from, 'FROZEN_FOODS', twiml);
   } else if (msg === '4') {
     await db.ref(`users/${from}`).update({
-      step: 'vendor_group_select',
+      step: 'vendor_select',
       selected_group: 'PHARMACY',
       order_type: 'food'
     });
@@ -995,7 +987,7 @@ async function handleMainMenu(from, msg, twiml) {
 
 async function showVendorsInGroup(from, groupKey, twiml) {
   const vendorKeys = VENDOR_GROUPS[groupKey];
-  let msg = `🏪 *Select ${groupKey.replace('_', ' ')}*\n\n`;
+  let msg = `🏪 *Select Vendor*\n\n`;
   
   vendorKeys.forEach((vKey, index) => {
     msg += `${index + 1}. ${VENDORS[vKey].name}\n`;
@@ -1005,32 +997,23 @@ async function showVendorsInGroup(from, groupKey, twiml) {
   twiml.message(msg);
 }
 
-async function handleVendorGroupSelect(from, choice, twiml) {
-  // FIX: Removed duplicate variable declaration
+async function handleVendorSelect(from, id, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
   const groupKey = user.selected_group;
   const vendorKeys = VENDOR_GROUPS[groupKey];
-
-  if (choice < 1 || choice > vendorKeys.length) {
-    return twiml.message("Invalid selection.");
+  
+  if (id < 1 || id > vendorKeys.length) {
+      return twiml.message("Invalid option.");
   }
 
-  const selectedVendorKey = vendorKeys[choice - 1];
+  const selectedVendorKey = vendorKeys[id - 1];
   
   await db.ref(`users/${from}`).update({
     step: 'category_select',
     selected_vendor: selectedVendorKey
   });
-
-  const vendor = VENDORS[selectedVendorKey];
-  const categories = Object.keys(vendor.categories);
-
-  if (categories.length === 1 && categories[0] === 'MENU') {
-    await showItems(from, 'MENU', twiml);
-  } else {
-    await showCategories(from, twiml);
-  }
+  await showCategories(from, twiml);
 }
 
 async function showCategories(from, twiml) {
@@ -1041,8 +1024,7 @@ async function showCategories(from, twiml) {
   const categories = Object.keys(vendor.categories);
 
   await db.ref(`users/${from}/step`).set('category_select');
-  
-  let msg = `📂 *${vendor.name} Categories*\n\n`;
+  let msg = `🍽️ *${vendor.name} Categories*\n\n`;
   categories.forEach((cat, index) => {
     msg += `${index + 1}. ${cat.replace(/_/g, ' ')}\n`;
   });
@@ -1058,39 +1040,27 @@ async function handleCategorySelect(from, msg, twiml) {
   const categories = Object.keys(vendor.categories);
   
   const choice = parseInt(msg);
-
-  if (isNaN(choice) || choice < 1 || choice > categories.length) {
-    return twiml.message("Invalid category. Try again.");
+  let categoryKey = '';
+  
+  if (choice > 0 && choice <= categories.length) {
+      categoryKey = categories[choice - 1];
+  } else {
+      return twiml.message("Invalid category. Reply 1, 2, or 3.");
   }
 
-  const selectedCat = categories[choice - 1];
-  
   await db.ref(`users/${from}`).update({
     step: 'item_select',
-    current_category: selectedCat
+    current_category: categoryKey
   });
 
-  await showItems(from, selectedCat, twiml);
-}
-
-async function showItems(from, catKey, twiml) {
-  const userSnap = await db.ref(`users/${from}`).once('value');
-  const user = userSnap.val();
-  const vKey = user.selected_vendor;
-  const items = VENDORS[vKey].categories[catKey];
-
-  let msg = `*${catKey.replace(/_/g, ')}*\n\n`;
-  items.forEach(item => {
-    let priceTxt = "";
-    if (item.reg && item.ext) {
-        priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`;
-    } else {
-        priceTxt = formatCurrency(item.price);
-    }
-    msg += `${item.id}. ${item.name} - ${priceTxt}\n`;
+  const cat = VENDORS[vKey].categories[categoryKey];
+  let txt = `*${categoryKey.replace('_', ' ')}*\n\n`;
+  cat.forEach(item => {
+    const priceTxt = (item.reg && item.ext) ? (item.reg === item.ext ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`) : formatCurrency(item.price);
+    txt += `${item.id}. ${item.name} - ${priceTxt}\n`;
   });
-  msg += `\nReply item number.`;
-  twiml.message(msg);
+  txt += `\nReply item number.`;
+  twiml.message(txt);
 }
 
 async function handleItemSelect(from, id, twiml) {
@@ -1111,15 +1081,8 @@ async function handleItemSelect(from, id, twiml) {
     let msg = `*${item.name}*\n\nSelect Portion:\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`;
     twiml.message(msg);
   } else {
-    let price = item.price || item.reg || item.ext;
-    let size = "Regular";
-    if (!item.price && !item.reg) price = 0; 
-
-    await db.ref(`users/${from}`).update({
-        step: 'quantity_select',
-        selected_item_price: price,
-        selected_size: size
-    });
+    await db.ref(`users/${from}/step`).set('quantity_select');
+    const price = item.price || item.reg || item.ext;
     twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(price)}\n\nHow many? (Enter number)`);
   }
 }
@@ -1154,43 +1117,115 @@ async function handleQuantitySelect(from, msg, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
   const item = userSnap.val().selected_item;
-  const price = user.selected_item_price;
-  const size = user.selected_size;
+  const price = user.selected_item_price || item.price || item.reg;
+  const size = user.selected_size || (item.reg === item.ext ? 'Regular' : 'Regular');
 
   const newItem = {
     name: item.name,
     price: price,
     qty: qty,
     size: size,
-    type: 'main'
+    type: user.current_category === 'PROTEINS' ? 'protein' : 'main'
   };
 
   const cart = user.cart || [];
   cart.push(newItem);
 
-  await db.ref(`users/${from}`).update({ cart: cart });
-  await showCartSummary(from, cart, twiml);
+  // Keep original logic for Bissy Joy's protein loop, but generalize for others
+  if (VENDORS[user.selected_vendor].categories['PROTEINS'] && user.current_category !== 'PROTEINS') {
+      await db.ref(`users/${from}`).update({
+        step: 'protein_loop',
+        cart: cart
+      });
+      twiml.message(`✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`);
+  } else {
+      await showCartSummary(from, cart, twiml);
+  }
 }
 
-async function handleAddMoreLoop(from, msg, twiml) {
-    const userSnap = await db.ref(`users/${from}`).once('value');
-    const user = userSnap.val();
+async function handleProteinLoop(from, msg, twiml) {
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const user = userSnap.val();
+  const vKey = user.selected_vendor;
+  const vendor = VENDORS[vKey];
+
+  // Only offer proteins if the vendor actually has a protein category
+  if (msg === '1' && vendor.categories['PROTEINS']) {
+    const cat = vendor.categories['PROTEINS'];
+    let txt = `🍗 *Proteins & Sides*\n\n`;
+    cat.forEach(item => {
+       const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`;
+       txt += `${item.id}. ${item.name} - ${priceTxt}\n`;
+    });
+    txt += `\nReply item number.`;
     
-    if (msg === '1') {
-       const vKey = user.selected_vendor;
-       const vendor = VENDORS[vKey];
-       const cats = Object.keys(vendor.categories);
-       if(cats.length > 1) {
-         await showCategories(from, twiml);
-       } else {
-         await showItems(from, cats[0], twiml);
-       }
-    } else if (msg === '2') {
-       await db.ref(`users/${from}`).update({ step: 'customer_name' });
-       twiml.message("📝 Please provide your Full Name.");
-    } else {
-       twiml.message("Reply 1 or 2.");
-    }
+    await db.ref(`users/${from}/step`).set('protein_select');
+    twiml.message(txt);
+  } else if (msg === '2' || !vendor.categories['PROTEINS']) {
+    await showCartSummary(from, user.cart, twiml);
+  } else {
+    twiml.message("Reply 1 or 2.");
+  }
+}
+
+async function handleProteinSelect(from, id, twiml) {
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const user = userSnap.val();
+  const vKey = user.selected_vendor;
+  const cat = VENDORS[vKey].categories['PROTEINS'];
+  const item = cat.find(i => i.id === id);
+  
+  if (!item) return twiml.message("Invalid item.");
+
+  await db.ref(`users/${from}`).update({
+    step: 'protein_size',
+    selected_item: item
+  });
+
+  if (item.reg === item.ext) {
+    await db.ref(`users/${from}/step`).set('protein_qty');
+    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many pieces?`);
+  } else {
+    twiml.message(`*${item.name}*\n\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`);
+  }
+}
+
+async function handleProteinSize(from, msg, twiml) {
+  if (msg !== '1' && msg !== '2') return twiml.message("Reply 1 or 2.");
+
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const item = userSnap.val().selected_item;
+  const size = msg === '1' ? 'reg' : 'ext';
+  
+  await db.ref(`users/${from}`).update({
+    step: 'protein_qty',
+    selected_item_price: item[size],
+    selected_size: msg === '1' ? 'Regular' : 'Extra'
+  });
+  twiml.message(`*${item.name} (${msg === '1' ? 'Regular' : 'Extra'})*\n\nHow many pieces?`);
+}
+
+async function handleProteinQty(from, msg, twiml) {
+    const qty = parseInt(msg);
+    if (isNaN(qty) || qty <= 0) return twiml.message("⚠️ Please enter a valid number.");
+
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const user = userSnap.val();
+  const item = userSnap.val().selected_item;
+  
+  const newItem = {
+    name: item.name,
+    price: user.selected_item_price,
+    qty: qty,
+    size: user.selected_size,
+    type: 'protein'
+  };
+
+  const cart = user.cart || [];
+  cart.push(newItem);
+
+  await db.ref(`users/${from}`).update({ cart: cart, step: 'protein_loop' });
+  twiml.message(`✅ Added ${qty}x ${item.name}.\n\nAdd another protein?\n1. Yes\n2. No (Checkout)`);
 }
 
 async function showCartSummary(from, cart, twiml) {
@@ -1202,7 +1237,7 @@ async function showCartSummary(from, cart, twiml) {
     txt += `${c.name} (${c.size}) x${c.qty} = ${formatCurrency(t)}\n`;
   });
   txt += `\n💰 Subtotal: ${formatCurrency(sub)}\n\n`;
-  txt += `Do you want to add another item?\n1. Yes\n2. No (Proceed to Delivery)`;
+  txt += `Do you want to add another meal?\n1. Yes (Add Food)\n2. No (Proceed to Delivery)`;
 
   await db.ref(`users/${from}`).update({
     step: 'add_more_or_checkout',
@@ -1272,6 +1307,8 @@ async function handleErrandDetails(from, text, twiml) {
   twiml.message(msg);
 }
 
+// --- NEW PICKUP FLOW FUNCTIONS ---
+
 async function handlePickupDescription(from, text, twiml) {
     if (!text || text.trim().length === 0) return twiml.message("⚠️ Description cannot be empty.");
     await db.ref(`users/${from}`).update({
@@ -1301,6 +1338,8 @@ async function handleVendorPhone(from, text, twiml) {
     twiml.message("👤 *What is YOUR Name?* (Customer Name)");
 }
 
+// --- GENERAL CHECKOUT FLOW HANDLERS ---
+
 async function handleCustomerName(from, text, twiml) {
     if (!text || text.trim().length === 0) return twiml.message("⚠️ Name cannot be empty.");
     await db.ref(`users/${from}`).update({
@@ -1321,10 +1360,9 @@ async function handleCustomerPhone(from, text, twiml) {
 
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
-    const vKey = user.selected_vendor;
 
-    if (user.order_type === 'food' && vKey) {
-        const vendor = VENDORS[vKey];
+    if (user.order_type === 'food') {
+        const vendor = VENDORS[user.selected_vendor];
         twiml.message(`📍 *Where is the Pickup Location?*\n\n1. ${vendor.name} (Default)\n2. Type a different address\n\nReply 1 or 2.`);
     } else {
         twiml.message("📍 *Where is the Pickup Location?*\n\n(e.g. Tarmac, School Road, Westend, Safari)");
@@ -1335,10 +1373,9 @@ async function handlePickupLocation(from, text, twiml) {
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
     let location = text;
-    const vKey = user.selected_vendor;
 
-    if (user.order_type === 'food' && vKey && text.trim() === '1') {
-        location = VENDORS[vKey].address;
+    if (user.order_type === 'food' && text.trim() === '1') {
+        location = VENDORS[user.selected_vendor].address;
     } else if (user.order_type === 'food' && text.trim() === '2') {
         await db.ref(`users/${from}/step`).set('pickup_location_manual');
         return twiml.message("📍 Please type the specific pickup address:");
@@ -1349,11 +1386,6 @@ async function handlePickupLocation(from, text, twiml) {
         pickup_location: location
     });
     twiml.message("📍 Where should the rider drop the items? (Your Hostel/Room/Address)");
-}
-
-async function handlePickupLocationManual(from, text, twiml) {
-    if(!text) return twiml.message("Address required.");
-    await handlePickupLocation(from, text, twiml);
 }
 
 async function handleDeliveryLocation(from, text, twiml) {
@@ -1373,11 +1405,11 @@ async function generateOrderSummary(from, twiml) {
     summary += `👤 Name: ${user.customer_name}\n`;
     summary += `📞 Phone: ${user.customer_phone}\n\n`;
 
-    if (user.selected_vendor) {
-        summary += `🏪 Vendor: ${VENDORS[user.selected_vendor].name}\n\n`;
-    } else if (user.vendor_name) {
+    if (user.vendor_name) {
         summary += `🏪 Pickup From: ${user.vendor_name}\n`;
         summary += `📞 Vendor Phone: ${user.vendor_phone}\n\n`;
+    } else if (user.selected_vendor) {
+        summary += `🏪 Vendor: ${VENDORS[user.selected_vendor].name}\n\n`;
     }
 
     if (user.order_type === 'food') {
@@ -1480,7 +1512,7 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
     }
 
     let itemsList = "";
-    if (user.order_type === 'food' && user.cart) {
+    if (user.order_type === 'food') {
       user.cart.forEach(c => itemsList += `- ${c.name} (${c.size}) x${c.qty}\n`);
     } else {
       if (user.errand_items) {
@@ -1645,14 +1677,21 @@ async function broadcastToRiders(orderId, order) {
   const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   
   let itemsSummary = "";
-  if (order.details) {
-      order.details.forEach(d => itemsSummary += `${d.name} x${d.qty || 1}, `);
+  if (order.type === 'food') {
+      order.details.forEach(d => itemsSummary += `${d.name} x${d.qty}, `);
       itemsSummary = itemsSummary.slice(0, -2);
+  } else {
+      itemsSummary = order.details[0].name;
   }
 
   let msg = `🛵 NEW JOB #${orderId}\n`;
   msg += `Customer: ${order.customer_name}\n`;
   msg += `Phone: ${order.customer_phone}\n`;
+  
+  if (order.vendor_name) {
+      msg += `Picking from: ${order.vendor_name}\n`;
+  }
+  
   msg += `Pickup: ${order.pickup_loc}\n`;
   msg += `Dropoff: ${order.delivery_loc}\n`;
   msg += `Items: ${itemsSummary}\n`;
