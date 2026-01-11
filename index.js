@@ -36,660 +36,40 @@ const DELIVERY_FEE = parseInt(process.env.DELIVERY_FEE) || 500;
 const SHOPPING_FEE = parseInt(process.env.SHOPPING_FEE) || 500;
 const SUPPORT_PHONE = "+2349138765380"; 
 
-// --- 4. VENDORS DATA ---
-const VENDORS = {
-  "BISSY_JOY": {
-    name: "Bissy Joy Eatery",
-    address: "Bissy Joy Eatery Kitchen",
-    categories: {
-      "RICE_MEALS": [
-        { id: 1, name: "White Rice", reg: 2500, ext: 3000 },
-        { id: 2, name: "Jollof & Fried Rice", reg: 2500, ext: 3000 },
-        { id: 3, name: "Chinese Rice", reg: 4000, ext: 5000 },
-        { id: 4, name: "Village Rice", reg: 4000, ext: 4500 },
-        { id: 5, name: "Jollof Macaroni", reg: 3000, ext: 3500 },
-        { id: 6, name: "Jollof Spaghetti", reg: 3000, ext: 3500 },
-        { id: 7, name: "Ofada Rice", reg: 4000, ext: 5000 },
-        { id: 8, name: "Beans & Rice", reg: 3000, ext: 3500 }
-      ],
-      "SWALLOWS": [
-        { id: 9, name: "Yam Porridge", reg: 3000, ext: 3500 },
-        { id: 10, name: "Yam & Egg", reg: 3000, ext: 3500 },
-        { id: 11, name: "Beans & Bread", reg: 2500, ext: 3000 },
-        { id: 12, name: "Eba", reg: 2500, ext: 3000 },
-        { id: 13, name: "Amala", reg: 2500, ext: 3000 },
-        { id: 14, name: "Fufu", reg: 3000, ext: 3500 },
-        { id: 15, name: "Pounded Yam", reg: 2500, ext: 3000 }
-      ],
-      "PROTEINS": [
-        { id: 16, name: "Pepper Soup", reg: 2800, ext: 3000 },
-        { id: 17, name: "Chicken", reg: 2000, ext: 2500 },
-        { id: 18, name: "Turkey", reg: 3500, ext: 4000 },
-        { id: 19, name: "Fish", reg: 2000, ext: 2500 },
-        { id: 20, name: "Assorted", reg: 500, ext: 1000 },
-        { id: 21, name: "Goat Meat", reg: 500, ext: 1000 },
-        { id: 22, name: "Ponmo", reg: 200, ext: 500 },
-        { id: 23, name: "Beef", reg: 500, ext: 500 }, 
-        { id: 24, name: "Egg", reg: 300, ext: 300 }
-      ]
-    }
-  },
-  "TEE_JAY": {
-    name: "Tee Jay Frozen Food",
-    address: "Tee Jay Frozen Foods Store",
-    categories: {
-      "FISH": [
-        { id: 1, name: "Shawa (Per Kilo)", price: 3400 },
-        { id: 2, name: "Titus (Per Kilo)", price: 7000 },
-        { id: 3, name: "Hake (Per Kilo)", price: 5200 },
-        { id: 4, name: "Kote (Per Kilo)", price: 4000 },
-        { id: 5, name: "Croacker (Per Kilo)", price: 6000 },
-        { id: 6, name: "Snail (Per Kilo)", price: 7000 },
-        { id: 7, name: "Cheese (Per Kilo)", price: 4000 }
-      ],
-      "TURKEY": [
-        { id: 1, name: "Wings (Per Kilo)", price: 9999 },
-        { id: 2, name: "Finger (Per Kilo)", price: 7000 },
-        { id: 3, name: "Chicken Filet (Per Kilo)", price: 6200 }
-      ],
-      "CHICKEN": [
-        { id: 1, name: "Whole (Per Kilo)", price: 4600 },
-        { id: 2, name: "Gizzard (Per Kilo)", price: 5200 },
-        { id: 3, name: "Leg & Head (Per Kilo)", price: 2200 },
-        { id: 4, name: "Neck (Per Kilo)", price: 2500 },
-        { id: 5, name: "Wings (Per Kilo)", price: 6000 },
-        { id: 6, name: "Breast (Per Kilo)", price: 5000 }
-      ],
-      "OTHERS": [
-        { id: 1, name: "Sausages (Per Pack)", price: 2600 },
-        { id: 2, name: "Sharwama Bread (Per Pack)", price: 1300 },
-        { id: 3, name: "Chips/Fries (Per Pack)", price: 4500 },
-        { id: 4, name: "Shrimps (Per Pack)", price: 13000 },
-        { id: 5, name: "Crabs (Per Pack)", price: 6000 }
-      ]
-    }
-  },
-  "BIGGY_SHACK": {
-    name: "Biggy’s Shack Sharwama",
-    address: "Biggy's Shack",
-    categories: {
-      "MENU": [
-        { id: 1, name: "Double Sausage Chicken", price: 3000 },
-        { id: 2, name: "Double Sausage Extra Chicken", price: 3500 },
-        { id: 3, name: "Double Sausage Chicken/Suya", price: 4000 },
-        { id: 4, name: "Double Sausage Suya Filled", price: 4000 },
-        { id: 5, name: "Combo Extra Chicken/Suya", price: 4500 },
-        { id: 6, name: "Bread Warma", price: 6000 },
-        { id: 7, name: "Big Men Size Shawarma", price: 8000 },
-        { id: 8, name: "Chicken and Chips", price: 5000 },
-        { id: 9, name: "Friends Combo", price: 7500 }
-      ]
-    }
-  },
-  "ZROF_PHARMACY": {
-    name: "Zrof Pharmacy",
-    address: "Zrof Pharmacy Store",
-    categories: {
-      "CONTRACEPTIVES": [
-        { id: 1, name: "Postinor 2", price: 2500 },
-        { id: 2, name: "Post Pill", price: 2500 },
-        { id: 3, name: "Back-up", price: 2000 }
-      ],
-      "SUPPLEMENTS": [
-        { id: 1, name: "Evening Primrose Oil", price: 13200 },
-        { id: 2, name: "Well Roze Capsules", price: 6200 },
-        { id: 3, name: "Omega H3", price: 3000 },
-        { id: 4, name: "Obron 6 Plus", price: 1500 },
-        { id: 5, name: "Feroglobin B12", price: 5800 }
-      ],
-      "MALARIA_TREATMENT": [
-        { id: 1, name: "Lonart-DS", price: 3700 },
-        { id: 2, name: "Amatem Softgel Forte", price: 3000 },
-        { id: 3, name: "Artequick", price: 6000 },
-        { id: 4, name: "P-Alaxin", price: 2000 },
-        { id: 5, name: "Co-Mal", price: 1000 }
-      ],
-      "SYRUPS_DROPS": [
-        { id: 1, name: "Sirop Dynewell Plus", price: 7500 },
-        { id: 2, name: "Dynewell", price: 4200 },
-        { id: 3, name: "De-Deon 5", price: 3500 },
-        { id: 4, name: "Apetadine", price: 2000 },
-        { id: 5, name: "Astymin/Astyfer", price: 4500 },
-        { id: 6, name: "Avro/Gold Apetit", price: 1500 }
-      ],
-      "OTHERS": [
-        { id: 1, name: "Strepsils Intensive", price: 3000 },
-        { id: 2, name: "Kiss", price: 550 },
-        { id: 3, name: "Gold Circle", price: 500 },
-        { id: 4, name: "Durex Feels", price: 1500 }
-      ]
-    }
-  },
-  "YK_NOODLES": {
-    name: "YK Noodles",
-    address: "YK Noodles Spot",
-    categories: {
-      "NOODLES": [
-        { id: 1, name: "Royal", price: 7950 },
-        { id: 2, name: "Tropicana", price: 7150 },
-        { id: 3, name: "Turkit Top", price: 6650 },
-        { id: 4, name: "Relish", price: 5850 },
-        { id: 5, name: "Sea Mix", price: 3950 },
-        { id: 6, name: "Delight", price: 3150 },
-        { id: 7, name: "Banger", price: 2650 },
-        { id: 8, name: "Classic", price: 1850 }
-      ]
-    }
-  },
-  "BIG_MUMMY": {
-    name: "Big Mummy’s Kitchen",
-    address: "Big Mummy's Kitchen",
-    categories: {
-      "MEALS": [
-        { id: 1, name: "Small Plate (Chicken)", price: 2500 },
-        { id: 2, name: "Big Plate (Chicken)", price: 3000 },
-        { id: 3, name: "Small Plate (Meat & Egg)", price: 2000 },
-        { id: 4, name: "Yam Porridge", price: 1500 },
-        { id: 5, name: "White Rice & Beans", price: 1500 }
-      ],
-      "EXTRAS": [
-        { id: 1, name: "Extra Chicken", price: 1000 },
-        { id: 2, name: "Extra Meat", price: 300 },
-        { id: 3, name: "Extra Egg", price: 300 }
-      ]
-    }
-  },
-  "DEEMEALLAB": {
-    name: "Deemeallab Restaurant",
-    address: "Deemeallab",
-    categories: {
-      "EVERYDAY_MEALS": [
-        { id: 1, name: "Spaghetti & Sauce", price: 2000 },
-        { id: 2, name: "Special Fried Rice", price: 4000 },
-        { id: 3, name: "Fried Rice", price: 1500 },
-        { id: 4, name: "Eba & Egusi", price: 1800 },
-        { id: 5, name: "White Rice & Beans", price: 1700 },
-        { id: 6, name: "Yam Porridge", price: 1500 },
-        { id: 7, name: "White Rice & Sauce", price: 1500 },
-        { id: 8, name: "White Rice", price: 1000 },
-        { id: 9, name: "Plantain", price: 500 },
-        { id: 10, name: "Coleslaw", price: 1500 },
-        { id: 11, name: "Bread", price: 1200 },
-        { id: 12, name: "Samosa/Chops", price: 1500 },
-        { id: 13, name: "Noodles", price: 1500 }
-      ],
-      "MONDAY_SPECIAL": [
-        { id: 1, name: "Catfish Stew", price: 2000 },
-        { id: 2, name: "Toast Bread + Coffee", price: 3500 },
-        { id: 3, name: "Tapioca", price: 3000 },
-        { id: 4, name: "Efo Riro + Swallow", price: 2500 },
-        { id: 5, name: "Moi Moi", price: 3000 }
-      ],
-      "PROTEINS": [
-        { id: 1, name: "Chicken Wings/Beef/Assorted/Ponmo/Kote/Panla", price: 1000 },
-        { id: 2, name: "Egg", price: 500 },
-        { id: 3, name: "Titus/Snail/Chicken/Catfish/Goat Meat", price: 2500 },
-        { id: 4, name: "Turkey", price: 4500 },
-        { id: 5, name: "Gizzard", price: 1000 },
-        { id: 6, name: "Smoked Catfish", price: 2500 }
-      ]
-    }
-  },
-  "SAVORE": {
-    name: "Savoré by Adebayo",
-    address: "Savoré by Adebayo",
-    categories: {
-      "SMALL_PLATES_CHICKEN": [
-        { id: 1, name: "Fried Rice & Jollof", price: 3000 },
-        { id: 2, name: "Jollof Only", price: 3000 },
-        { id: 3, name: "Stir-fry Rice", price: 3000 },
-        { id: 4, name: "Stir-fried Spaghetti", price: 3200 }
-      ],
-      "BIG_PLATES_CHICKEN": [
-        { id: 1, name: "Fried Rice & Jollof", price: 4000 },
-        { id: 2, name: "Jollof Only", price: 4000 },
-        { id: 3, name: "Stir-fry Rice", price: 4000 },
-        { id: 4, name: "Stir-fried Spaghetti", price: 4200 }
-      ],
-      "SMALL_PLATES_TURKEY": [
-        { id: 1, name: "Fried Rice & Jollof", price: 4000 },
-        { id: 2, name: "Jollof Only", price: 4000 },
-        { id: 3, name: "Stir-fry Rice", price: 4000 },
-        { id: 4, name: "Stir-fried Spaghetti", price: 4200 }
-      ],
-      "BIG_PLATES_TURKEY": [
-        { id: 1, name: "Fried Rice & Jollof", price: 5500 },
-        { id: 2, name: "Jollof Only", price: 5500 },
-        { id: 3, name: "Stir-fry Rice", price: 5500 },
-        { id: 4, name: "Stir-fried Spaghetti", price: 5700 }
-      ],
-      "EXTRAS": [
-        { id: 1, name: "Plantain", price: 500 },
-        { id: 2, name: "Coleslaw", price: 500 },
-        { id: 3, name: "Extra Chicken", price: 1500 },
-        { id: 4, name: "Extra Turkey", price: 3000 }
-      ],
-      "BENTO_CAKES": [
-        { id: 1, name: "Basic", price: 8500 },
-        { id: 2, name: "Whipped Cream", price: 10000 }
-      ]
-    }
-  },
-  "ROYAL_CHAW": {
-    name: "Royal Chaw Spot",
-    address: "Royal Chaw Spot",
-    categories: {
-      "SHARWAMA": [
-        { id: 1, name: "No Sausage", price: 2000 },
-        { id: 2, name: "Single Sausage", price: 2500 },
-        { id: 3, name: "Double Sausage", price: 3000 },
-        { id: 4, name: "Royal Special", price: 4000 },
-        { id: 5, name: "Cheesy", price: 4000 }
-      ],
-      "BURGERS": [
-        { id: 1, name: "Single Chicken", price: 5000 },
-        { id: 2, name: "Double Chicken", price: 6000 }
-      ],
-      "FRIES": [
-        { id: 1, name: "Loaded", price: 5000 },
-        { id: 2, name: "Loaded + Cheese", price: 6000 },
-        { id: 3, name: "Chicken & Fries", price: 5000 },
-        { id: 4, name: "Extra Chicken", price: 1500 },
-        { id: 5, name: "Extra Fries", price: 1000 }
-      ],
-      "BREAD_SHARWAMA": [
-        { id: 1, name: "No Sausage", price: 2000 },
-        { id: 2, name: "Single Sausage", price: 2500 },
-        { id: 3, name: "Double Sausage", price: 3000 },
-        { id: 4, name: "Jumbo", price: 3500 }
-      ],
-      "OTHERS": [
-        { id: 1, name: "Sandwich", price: 700 },
-        { id: 2, name: "Royal Pizza", price: 10000 },
-        { id: 3, name: "Nkwobi Small", price: 4000 },
-        { id: 4, name: "Nkwobi Large", price: 6000 }
-      ],
-      "BARBECUE": [
-        { id: 1, name: "Small", price: 4000 },
-        { id: 2, name: "Medium", price: 5000 },
-        { id: 3, name: "Large", price: 6500 }
-      ]
-    }
-  },
-  "HOT_OOLE": {
-    name: "Hot Oole",
-    address: "Hot Oole Spot",
-    categories: {
-      "MENU": [
-        { id: 1, name: "Special Combo Moi Moi", price: 1500 },
-        { id: 2, name: "Moi Moi (With Egg)", price: 700 },
-        { id: 3, name: "Moi Moi (With Fish)", price: 600 },
-        { id: 4, name: "Moi Moi (Plain)", price: 400 },
-        { id: 5, name: "Tapioca (Small)", price: 1200 },
-        { id: 6, name: "Tapioca (Big)", price: 1500 },
-        { id: 7, name: "Fura (Small)", price: 1200 },
-        { id: 8, name: "Fura (Big)", price: 1500 },
-        { id: 9, name: "Extra Milk", price: 300 },
-        { id: 10, name: "Kunu/Zobo", price: 1000 },
-        { id: 11, name: "Breakfast Combo", price: 3000 }
-      ]
-    }
-  },
-  "WRAP_STAR": {
-    name: "Wrap Star Shawarma",
-    address: "Wrap Star",
-    categories: {
-      "SHARWAMA": [
-        { id: 1, name: "Chicken", price: 2500 },
-        { id: 2, name: "Beef", price: 2800 },
-        { id: 3, name: "Single Sausage", price: 2700 },
-        { id: 4, name: "Double Sausage", price: 3000 },
-        { id: 5, name: "Chicken & Beef", price: 3000 },
-        { id: 6, name: "Mixed + 1 Sausage", price: 3500 },
-        { id: 7, name: "Mixed + 2 Sausage", price: 3800 },
-        { id: 8, name: "Special", price: 4500 }
-      ],
-      "BURGERS": [
-        { id: 1, name: "Single Chicken", price: 4500 },
-        { id: 2, name: "Double Chicken", price: 5000 },
-        { id: 3, name: "Beef Suya", price: 4500 }
-      ],
-      "FRIES": [
-        { id: 1, name: "Fries & Chicken", price: 5500 },
-        { id: 2, name: "Beef Kebab", price: 2000 },
-        { id: 3, name: "Kebab & Fries", price: 4500 },
-        { id: 4, name: "Fries Combo", price: 7000 },
-        { id: 5, name: "Loaded Fries", price: 6000 }
-      ]
-    }
-  },
-  "CHAO_COCINA": {
-    name: "Chao Cocina",
-    address: "Chao Cocina",
-    categories: {
-      "STIRFRY_SPAGHETTI": [
-        { id: 1, name: "Large Turkey", price: 3800 },
-        { id: 2, name: "Medium Turkey", price: 3300 },
-        { id: 3, name: "Large Asun", price: 3300 },
-        { id: 4, name: "Medium Asun", price: 3000 }
-      ],
-      "EXTRAS": [
-        { id: 1, name: "Turkey", price: 2800 },
-        { id: 2, name: "Asun", price: 2000 },
-        { id: 3, name: "Stirfry", price: 1000 },
-        { id: 4, name: "Sausage", price: 400 }
-      ],
-      "SIDES": [
-        { id: 1, name: "Fries & Turkey", price: 5500 },
-        { id: 2, name: "Fries & Asun", price: 5000 },
-        { id: 3, name: "Plantain", price: 500 },
-        { id: 4, name: "Ketchup", price: 300 }
-      ],
-      "DRINKS": [
-        { id: 1, name: "Water", price: 300 },
-        { id: 2, name: "Soft Drinks", price: 500 },
-        { id: 3, name: "Fearless/Malt", price: 600 },
-        { id: 4, name: "Fayrouz/Chivita", price: 800 }
-      ]
-    }
-  },
-  "KRAFTY_KITCHEN": {
-    name: "Krafty Kitchen",
-    address: "Krafty Kitchen",
-    categories: {
-      "FOOD": [
-        { id: 1, name: "Small Plate Chicken", price: 2500 },
-        { id: 2, name: "Big Plate Chicken", price: 3000 },
-        { id: 3, name: "Ofada Rice", price: 4500 },
-        { id: 4, name: "Fish BBQ", price: 3000 },
-        { id: 5, name: "Pasta Chicken (Small)", price: 3000 },
-        { id: 6, name: "Pasta Chicken (Big)", price: 3500 },
-        { id: 7, name: "Pasta Beef (Small)", price: 2200 },
-        { id: 8, name: "Pasta Beef (Big)", price: 2700 },
-        { id: 9, name: "Rice Beef (Small)", price: 1700 },
-        { id: 10, name: "Rice Beef (Big)", price: 2200 }
-      ],
-      "SIDES": [
-        { id: 1, name: "Plantain", price: 500 },
-        { id: 2, name: "Coleslaw", price: 500 },
-        { id: 3, name: "Fruit Parfait (Small)", price: 3500 },
-        { id: 4, name: "Fruit Parfait (Big)", price: 4000 },
-        { id: 5, name: "Beef", price: 500 },
-        { id: 6, name: "Egg", price: 400 }
-      ],
-      "SHARWAMA": [
-        { id: 1, name: "No Sausage", price: 2000 },
-        { id: 2, name: "Chicken/Beef", price: 2500 },
-        { id: 3, name: "Combo", price: 3000 },
-        { id: 4, name: "+ Single Sausage", price: 2500 },
-        { id: 5, name: "+ Double Sausage", price: 3000 },
-        { id: 6, name: "Special with Drink", price: 4000 }
-      ],
-      "DRINKS": [
-        { id: 1, name: "Viju/Nutri Milk", price: 700 },
-        { id: 2, name: "Soda/Water", price: 400 },
-        { id: 3, name: "Fearless/Predator", price: 600 },
-        { id: 4, name: "Zobo/Exotic", price: 800 },
-        { id: 5, name: "Big Exotic", price: 1500 },
-        { id: 6, name: "Monster/Berry Blast", price: 1800 }
-      ]
-    }
-  },
-  "SPAG_CITY": {
-    name: "Spag City",
-    address: "Spag City",
-    categories: {
-      "MENU": [
-        { id: 1, name: "Spag & Big Turkey", price: 6500 },
-        { id: 2, name: "Spag & Mid Turkey", price: 4000 },
-        { id: 3, name: "Spag & Chicken", price: 3600 },
-        { id: 4, name: "Sharwama Single Sausage", price: 2500 },
-        { id: 5, name: "Sharwama Double Sausage", price: 3000 }
-      ],
-      "EXTRAS": [
-        { id: 1, name: "Beef", price: 500 },
-        { id: 2, name: "Sausage", price: 500 },
-        { id: 3, name: "Plantain", price: 500 },
-        { id: 4, name: "Coleslaw", price: 500 },
-        { id: 5, name: "Asun", price: 2000 }
-      ]
-    }
-  },
-  "HD_TREATS": {
-    name: "HD Treats",
-    address: "HD Treats",
-    categories: {
-      "BURGERS": [
-        { id: 1, name: "Single Chicken/Beef", price: 5000 },
-        { id: 2, name: "Double Chicken/Beef", price: 7000 }
-      ],
-      "SHAWARMA": [
-        { id: 1, name: "Beef/Chicken", price: 3500 },
-        { id: 2, name: "Jumbo", price: 5000 },
-        { id: 3, name: "Extra Sausage/Chicken", price: 500 }
-      ],
-      "SANDWICH": [
-        { id: 1, name: "Club Chicken/Beef", price: 3500 },
-        { id: 2, name: "Philly Cheese/Chicken Melt", price: 7000 }
-      ],
-      "BEVERAGES": [
-        { id: 1, name: "Fruity Zobo", price: 1500 },
-        { id: 2, name: "Juices/Yoghurt", price: 2500 },
-        { id: 3, name: "Greek Yoghurt 500ml", price: 5000 },
-        { id: 4, name: "Greek Yoghurt 1L", price: 9500 },
-        { id: 5, name: "Parfait 500ml", price: 6500 },
-        { id: 6, name: "Parfait 1L", price: 12500 }
-      ],
-      "MILKSHAKES": [
-        { id: 1, name: "All Flavors", price: 7000 }
-      ],
-      "PIZZA": [
-        { id: 1, name: "Beef/Chicken/Margherita (S)", price: 6000 },
-        { id: 2, name: "Beef/Chicken/Margherita (M)", price: 8000 },
-        { id: 3, name: "Beef/Chicken/Margherita (L)", price: 10000 },
-        { id: 4, name: "Pepperoni (S)", price: 7000 },
-        { id: 5, name: "Pepperoni (M)", price: 9000 },
-        { id: 6, name: "Pepperoni (L)", price: 11000 },
-        { id: 7, name: "BBQ (S)", price: 8000 },
-        { id: 8, name: "BBQ (M)", price: 10000 },
-        { id: 9, name: "BBQ (L)", price: 12000 },
-        { id: 10, name: "Supreme (S)", price: 10000 },
-        { id: 11, name: "Supreme (M)", price: 13000 },
-        { id: 12, name: "Supreme (L)", price: 16000 }
-      ]
-    }
-  },
-  "IMOLE_PATISSERIE": {
-    name: "Imole’s Patisserie",
-    address: "Imole's Patisserie",
-    categories: {
-      "BAKERY": [
-        { id: 1, name: "Chicken Pie", price: 1000 },
-        { id: 2, name: "Meatpie", price: 1000 },
-        { id: 3, name: "Sausage Roll", price: 500 },
-        { id: 4, name: "Full Sausage", price: 1000 },
-        { id: 5, name: "Egg Roll", price: 500 },
-        { id: 6, name: "Small Chops (Chicken)", price: 3500 },
-        { id: 7, name: "Small Chops (Beef)", price: 2500 },
-        { id: 8, name: "Doughnuts (Pack of 3)", price: 4500 },
-        { id: 9, name: "Doughnuts (Pack of 6)", price: 8500 },
-        { id: 10, name: "Cake Slice", price: 3000 },
-        { id: 11, name: "Ice Cream Plate (S)", price: 1000 },
-        { id: 12, name: "Ice Cream Plate (M)", price: 1500 },
-        { id: 13, name: "Ice Cream Plate (L)", price: 2200 }
-      ],
-      "CAKES": [
-        { id: 1, name: "Birthday 6inch", price: 15000 },
-        { id: 2, name: "Birthday 8inch", price: 20000 },
-        { id: 3, name: "Birthday 10inch", price: 25000 }
-      ],
-      "PARFAIT": [
-        { id: 1, name: "Small", price: 3500 },
-        { id: 2, name: "Big", price: 4500 }
-      ]
-    }
-  },
-  "FINEY_PRICES": {
-    name: "Finey Prices",
-    address: "Finey Prices",
-    categories: {
-      "RICE_PASTA": [
-        { id: 1, name: "Rice/Pasta (Beef/Egg/Ponmo)", price: 1800 },
-        { id: 2, name: "Rice/Pasta (Goat Meat)", price: 2300 },
-        { id: 3, name: "Rice/Pasta (Fish/Chicken)", price: 2500 },
-        { id: 4, name: "Rice/Pasta (Turkey)", price: 4250 }
-      ],
-      "NOODLES": [
-        { id: 1, name: "Stirfry (Beef/Egg)", price: 1800 },
-        { id: 2, name: "Fried Egg", price: 2000 },
-        { id: 3, name: "Chicken", price: 3000 },
-        { id: 4, name: "Fish", price: 2800 },
-        { id: 5, name: "Turkey", price: 4750 }
-      ],
-      "OFADA_NATIVE": [
-        { id: 1, name: "Beef", price: 2800 },
-        { id: 2, name: "Goat Meat", price: 3200 },
-        { id: 3, name: "Fish", price: 3500 },
-        { id: 4, name: "Chicken", price: 4000 },
-        { id: 5, name: "Turkey", price: 5250 }
-      ],
-      "PORRIDGE_PLANTAIN_YAM": [
-        { id: 1, name: "Mini", price: 3000 },
-        { id: 2, name: "Maxi", price: 4250 }
-      ],
-      "PEPPERED_SOUP": [
-        { id: 1, name: "Gizdodo/Asun (S)", price: 2000 },
-        { id: 2, name: "Gizdodo/Asun (L)", price: 5000 },
-        { id: 3, name: "Snail (S)", price: 2500 },
-        { id: 4, name: "Snail (L)", price: 5000 },
-        { id: 5, name: "Ponmo (S)", price: 1500 },
-        { id: 6, name: "Ponmo (L)", price: 3000 },
-        { id: 7, name: "Protein & Plantain", price: 6500 }
-      ]
-    }
-  },
-  "ROYALS_TREAT": {
-    name: "Royal’s Treat and Tidbits",
-    address: "Royal's Treat",
-    categories: {
-      "MEALS": [
-        { id: 1, name: "Stir Fry Spaghetti Chicken", price: 4500 },
-        { id: 2, name: "Extra Plate Stir Fry", price: 5500 },
-        { id: 3, name: "Yam and Egg Sauce", price: 4500 },
-        { id: 4, name: "Basmati Jambalaya Rice & Turkey", price: 8500 },
-        { id: 5, name: "Stir Spaghetti Chicken & Plantain", price: 5000 },
-        { id: 6, name: "Basmati Rice and Gizzdodo", price: 7000 }
-      ],
-      "SNACKS": [
-        { id: 1, name: "Small Chops", price: 4500 },
-        { id: 2, name: "Chicken Pie", price: 1200 },
-        { id: 3, name: "Meat Pie", price: 1200 },
-        { id: 4, name: "Buns", price: 200 },
-        { id: 5, name: "Doughnuts", price: 700 },
-        { id: 6, name: "Egg Roll", price: 700 }
-      ],
-      "PARFAIT": [
-        { id: 1, name: "Fruit Parfait", price: 4500 },
-        { id: 2, name: "Cake Parfait", price: 3500 }
-      ]
-    }
-  },
-  "OKELE_JOINT": {
-    name: "Okele Joint",
-    address: "Okele Joint",
-    categories: {
-      "SWALLOW": [
-        { id: 1, name: "Amala", price: 300 },
-        { id: 2, name: "Pounded Yam", price: 500 },
-        { id: 3, name: "Semo/Fufu/Eba/Tuwo", price: 200 }
-      ],
-      "PROTEIN": [
-        { id: 1, name: "Cow Meat", price: 200 },
-        { id: 2, name: "Goat Meat", price: 500 },
-        { id: 3, name: "Fish (Small)", price: 1000 },
-        { id: 4, name: "Fish (Big)", price: 2000 },
-        { id: 5, name: "Wara", price: 300 },
-        { id: 6, name: "Ponmo", price: 300 },
-        { id: 7, name: "Cow Leg (Small)", price: 400 },
-        { id: 8, name: "Cow Leg (Big)", price: 500 },
-        { id: 9, name: "Chicken", price: 1500 },
-        { id: 10, name: "Smoke Fish", price: 500 },
-        { id: 11, name: "Hake Fish", price: 1000 }
-      ]
-    }
-  },
-  "IYA_AFUSAT": {
-    name: "Iya Afusat Kitchen",
-    address: "Iya Afusat",
-    categories: {
-      "MAIN_MEALS": [
-        { id: 1, name: "Rice/Beans/Jollof/Spag/Bread", price: 750 },
-        { id: 2, name: "Plantain", price: 200 }
-      ],
-      "SWALLOW": [
-        { id: 1, name: "Semo/Eba/Fufu/Iyan/Amala", price: 200 }
-      ],
-      "PROTEIN": [
-        { id: 1, name: "Beef (Small)", price: 200 },
-        { id: 2, name: "Beef (Big)", price: 500 },
-        { id: 3, name: "Ponmo", price: 500 },
-        { id: 4, name: "Titus", price: 1000 },
-        { id: 5, name: "Wara", price: 500 },
-        { id: 6, name: "Egg", price: 400 }
-      ]
-    }
-  },
-  "JAMBLACK_HUBS": {
-    name: "Jamblack Hubs",
-    address: "Jamblack Hubs",
-    categories: {
-      "SHAWARMA": [
-        { id: 1, name: "Medium", price: 3500 },
-        { id: 2, name: "Large", price: 5000 }
-      ],
-      "PASTA_MEALS": [
-        { id: 1, name: "Spaghetti Chicken", price: 3500 },
-        { id: 2, name: "Spaghetti Turkey", price: 5500 },
-        { id: 3, name: "Penne Pasta Chicken", price: 4500 }
-      ],
-      "EXTRAS": [
-        { id: 1, name: "Turkey", price: 6500 },
-        { id: 2, name: "Toast Bread", price: 700 },
-        { id: 3, name: "Beef", price: 500 },
-        { id: 4, name: "Ponmo", price: 500 },
-        { id: 5, name: "Sausage", price: 500 },
-        { id: 6, name: "Plantain", price: 500 }
-      ]
-    }
-  },
-  "OPEYEMI_CANTEEN": {
-    name: "Opeyemi Food Canteen",
-    address: "Opeyemi Canteen",
-    categories: {
-      "SWALLOW": [
-        { id: 1, name: "Pounded Yam", price: 600 },
-        { id: 2, name: "Amala/Eba/Semo", price: 200 }
-      ],
-      "PROTEIN": [
-        { id: 1, name: "Beef", price: 500 },
-        { id: 2, name: "Turkey", price: 4000 },
-        { id: 3, name: "Ponmo", price: 500 },
-        { id: 4, name: "Titus", price: 2000 },
-        { id: 5, name: "Wara", price: 500 }
-      ],
-      "SOUP": [
-        { id: 1, name: "Soup (Free with Swallow)", price: 0 }
-      ]
-    }
-  }
-};
-
-const VENDOR_GROUPS = {
-  "RESTAURANTS": ["BISSY_JOY", "BIG_MUMMY", "DEEMEALLAB", "SAVORE", "FINEY_PRICES", "OKELE_JOINT", "IYA_AFUSAT", "OPEYEMI_CANTEEN"],
-  "SHAWARMA_FAST_FOOD": ["BIGGY_SHACK", "ROYAL_CHAW", "WRAP_STAR", "CHAO_COCINA", "SPAG_CITY", "JAMBLACK_HUBS", "ROYALS_TREAT"],
-  "NOODLES_SNACKS": ["YK_NOODLES", "HOT_OOLE", "KRAFTY_KITCHEN", "IMOLE_PATISSERIE", "HD_TREATS"],
-  "FROZEN_FOODS": ["TEE_JAY"],
-  "PHARMACY": ["ZROF_PHARMACY"]
+// --- 4. MENU DATA (Bissy Joy Eatery) ---
+const VENDOR_NAME = "Bissy Joy Eatery";
+const VENDOR_ADDRESS = "Bissy Joy Eatery Kitchen";
+const MENU_CATEGORIES = {
+  "RICE_MEALS": [
+    { id: 1, name: "White Rice", reg: 2500, ext: 3000 },
+    { id: 2, name: "Jollof & Fried Rice", reg: 2500, ext: 3000 },
+    { id: 3, name: "Chinese Rice", reg: 4000, ext: 5000 },
+    { id: 4, name: "Village Rice", reg: 4000, ext: 4500 },
+    { id: 5, name: "Jollof Macaroni", reg: 3000, ext: 3500 },
+    { id: 6, name: "Jollof Spaghetti", reg: 3000, ext: 3500 },
+    { id: 7, name: "Ofada Rice", reg: 4000, ext: 5000 },
+    { id: 8, name: "Beans & Rice", reg: 3000, ext: 3500 }
+  ],
+  "SWALLOWS": [
+    { id: 9, name: "Yam Porridge", reg: 3000, ext: 3500 },
+    { id: 10, name: "Yam & Egg", reg: 3000, ext: 3500 },
+    { id: 11, name: "Beans & Bread", reg: 2500, ext: 3000 },
+    { id: 12, name: "Eba", reg: 2500, ext: 3000 },
+    { id: 13, name: "Amala", reg: 2500, ext: 3000 },
+    { id: 14, name: "Fufu", reg: 3000, ext: 3500 },
+    { id: 15, name: "Pounded Yam", reg: 2500, ext: 3000 }
+  ],
+  "PROTEINS": [
+    { id: 16, name: "Pepper Soup", reg: 2800, ext: 3000 },
+    { id: 17, name: "Chicken", reg: 2000, ext: 2500 },
+    { id: 18, name: "Turkey", reg: 3500, ext: 4000 },
+    { id: 19, name: "Fish", reg: 2000, ext: 2500 },
+    { id: 20, name: "Assorted", reg: 500, ext: 1000 },
+    { id: 21, name: "Goat Meat", reg: 500, ext: 1000 },
+    { id: 22, name: "Ponmo", reg: 200, ext: 500 },
+    { id: 23, name: "Beef", reg: 500, ext: 500 }, 
+    { id: 24, name: "Egg", reg: 300, ext: 300 }
+  ]
 };
 
 // --- 5. HELPERS ---
@@ -699,10 +79,6 @@ function generateId() {
 
 function formatCurrency(amount) {
   return `₦${amount.toLocaleString()}`;
-}
-
-function appendCancel(msg) {
-    return msg + "\n\nReply 0 to Cancel.";
 }
 
 // --- 6. MAIN WEBHOOK ROUTE ---
@@ -719,7 +95,7 @@ app.post('/whatsapp', async (req, res) => {
   try {
     // --- A. SUPPORT KEYWORDS ---
     if (msg.includes('support') || msg.includes('help') || msg.includes('agent') || msg.includes('problem')) {
-        twiml.message(appendCancel(`🆘 *Customer Support*\n\nIf you are having trouble with the bot, please contact our agent directly:\n\n📞 WhatsApp: ${SUPPORT_PHONE}`));
+        twiml.message(`🆘 *Customer Support*\n\nIf you are having trouble with the bot, please contact our agent directly:\n\n📞 WhatsApp: ${SUPPORT_PHONE}`);
         return res.type('text/xml').send(twiml.toString());
     }
 
@@ -733,7 +109,7 @@ app.post('/whatsapp', async (req, res) => {
         await createOrderInDB(from, user, twiml, mediaUrl);
         return res.type('text/xml').send(twiml.toString());
       } else {
-        twiml.message(appendCancel("Please complete the text steps first. Reply 'Menu' to restart."));
+        twiml.message("Please complete the text steps first. Reply 'Menu' to restart.");
         return res.type('text/xml').send(twiml.toString());
       }
     }
@@ -751,7 +127,7 @@ app.post('/whatsapp', async (req, res) => {
           phone: from,
           joined_at: new Date().toISOString()
         });
-        twiml.message(appendCancel(`✅ Registration Successful!\n\nWelcome ${riderName}. Text "ON DUTY" to start.`));
+        twiml.message(`✅ Registration Successful!\n\nWelcome ${riderName}. Text "ON DUTY" to start.`);
       } else {
         twiml.message('❌ Invalid Registration Code.');
       }
@@ -762,17 +138,19 @@ app.post('/whatsapp', async (req, res) => {
     const user = userSnap.val() || { step: 'new' };
 
     // --- GLOBAL CANCEL COMMAND ---
-    if (msg === 'cancel' || msg === '0') {
+    if ((msg === 'cancel' || msg === '0') && user.step !== 'main_menu' && user.step !== 'new') {
         await resetUser(from, twiml);
         return res.type('text/xml').send(twiml.toString());
     }
 
     // --- CHECK ACTIVE ORDER STATUS (BLOCKING STATE) ---
+    // If user has a recent order that is pending or seeking rider, ignore all other inputs
     const orderId = user.last_order_id;
     if (orderId) {
         const orderSnap = await db.ref(`orders/${orderId}`).once('value');
         const order = orderSnap.val();
         
+        // Only block if the order is in a "waiting" phase
         if (order && (order.status === 'pending_payment' || order.status === 'seeking_rider' || order.status === 'rider_accepted')) {
             let msg = "";
             if (order.status === 'pending_payment') {
@@ -782,6 +160,7 @@ app.post('/whatsapp', async (req, res) => {
             } else if (order.status === 'rider_accepted') {
                 msg = "⏳ *Rider Assigned*\n\nYour order has been accepted by a rider.\n\nDon't reply here. Contact the rider directly.";
             }
+
             twiml.message(msg);
             return res.type('text/xml').send(twiml.toString());
         }
@@ -792,13 +171,13 @@ app.post('/whatsapp', async (req, res) => {
       if (msg.startsWith('approve ')) {
         const orderId = msg.split(' ')[1];
         await approveOrder(orderId);
-        twiml.message(appendCancel(`Order #${orderId} Approved.`));
+        twiml.message(`Order #${orderId} Approved.`);
         return res.type('text/xml').send(twiml.toString());
       }
       if (msg.startsWith('reject ')) {
         const orderId = msg.split(' ')[1];
         await rejectOrder(orderId);
-        twiml.message(appendCancel(`Order #${orderId} Rejected.`));
+        twiml.message(`Order #${orderId} Rejected.`);
         return res.type('text/xml').send(twiml.toString());
       }
     }
@@ -840,14 +219,12 @@ app.post('/whatsapp', async (req, res) => {
       case 'main_menu':
         await handleMainMenu(from, msg, twiml);
         break;
-      case 'vendor_group_select':
-        await handleVendorGroupSelect(from, parseInt(msg), twiml);
-        break;
       case 'vendor_select':
-        await handleVendorSelect(from, parseInt(msg), twiml);
+        if (msg === '1') await showCategories(from, twiml);
+        else twiml.message("Invalid option. Reply 1.");
         break;
       case 'category_select':
-        await handleCategorySelect(from, msg, twiml);
+        await handleCategorySelect(from, parseInt(msg), twiml);
         break;
       case 'item_select':
         await handleItemSelect(from, parseInt(msg), twiml);
@@ -875,7 +252,7 @@ app.post('/whatsapp', async (req, res) => {
            await showCategories(from, twiml); 
         } else if (msg === '2') {
            await db.ref(`users/${from}`).update({ step: 'customer_name' });
-           twiml.message(appendCancel("📝 Please provide your Full Name."));
+           twiml.message("📝 Please provide your Full Name.");
         } else {
            twiml.message("Reply 1 or 2.");
         }
@@ -886,6 +263,7 @@ app.post('/whatsapp', async (req, res) => {
       case 'errand_details':
         await handleErrandDetails(from, originalMsg, twiml);
         break;
+      // --- NEW PICKUP FLOW STEPS ---
       case 'pickup_description':
         await handlePickupDescription(from, originalMsg, twiml);
         break;
@@ -895,6 +273,7 @@ app.post('/whatsapp', async (req, res) => {
       case 'vendor_phone':
         await handleVendorPhone(from, originalMsg, twiml);
         break;
+      // -----------------------------
       case 'customer_name':
         await handleCustomerName(from, originalMsg, twiml);
         break;
@@ -917,7 +296,7 @@ app.post('/whatsapp', async (req, res) => {
         await handleRateService(from, msg, twiml);
         break;
       default:
-        twiml.message(appendCancel("I didn't understand that. Reply 'Menu' to restart."));
+        twiml.message("I didn't understand that. Reply 'Menu' to restart.");
     }
 
     res.type('text/xml').send(twiml.toString());
@@ -936,130 +315,64 @@ async function resetUser(from, twiml) {
     step: 'main_menu',
     cart: [],
     order_type: null,
-    last_order_id: null, // FIX: Explicitly clear order ID to allow restart
-    errand_data: {},
-    selected_vendor: null,
-    current_category: null
+    errand_data: {}
   });
-  const welcomeMsg = `🍽️ *Welcome to ChowZone!*\n\nHow can we help you today?\n\n1. 🍽️ Order Food (Restaurants)\n2. 🌯 Shawarma & Snacks\n3. 🥶 Frozen Foods\n4. 💊 Pharmacy\n5. 🛒 Errands & Shopping\n\nReply with number 1-5.\n(Text 'Cancel' anytime to restart)`;
+  const welcomeMsg = `🍽️ *Welcome to ChowZone!*\n\nHow can we help you today?\n\n1. Order Food\n2. Errands (Market/Pharmacy/Pickup)\n\nReply with number 1 or 2.\n(Text 'Cancel' anytime to restart)`;
   twiml.message(welcomeMsg);
 }
 
 async function handleMainMenu(from, msg, twiml) {
   if (msg === '1') {
     await db.ref(`users/${from}`).update({
-      step: 'vendor_group_select',
-      order_type: 'food',
-      cart: [] // Ensure cart exists
+      step: 'vendor_select',
+      order_type: 'food'
     });
-    const menuMsg = `🏪 *Select Food Category*\n\n1. 🍽️ Restaurants\n2. 🌯 Shawarma & Fast Food\n3. 🥶 Frozen Foods\n4. 💊 Pharmacy\n5. 🧁 Noodles & Snacks\n\nReply with number.`;
-    twiml.message(appendCancel(menuMsg));
+    twiml.message(`🏪 *Select Vendor*\n\n1. ${VENDOR_NAME}\n\nReply 1.`);
   } else if (msg === '2') {
     await db.ref(`users/${from}`).update({
       step: 'errand_type',
       order_type: 'errand'
     });
-    twiml.message(appendCancel(`🏃 *Select Errand Type*\n\n1. 🛒 Market Shopping\n2. 📦 Pick Up Item\n3. 📝 Campus Task\n\nReply with number.`));
+    twiml.message(`🏃 *Select Errand Type*\n\n1. 🛒 Market Shopping\n2. 📦 Pick Up Item\n3. 💊 Pharmacy / Supermarket\n4. 📝 Campus Task\n\nReply with number.`);
   } else {
-    twiml.message(appendCancel("Invalid option. Reply 1 or 2."));
+    twiml.message("Invalid option. Reply 1 or 2.");
   }
 }
 
-async function handleVendorGroupSelect(from, choice, twiml) {
-  let groupKey = "";
-  if (choice === 1) { groupKey = "RESTAURANTS"; }
-  else if (choice === 2) { groupKey = "SHAWARMA_FAST_FOOD"; }
-  else if (choice === 3) { groupKey = "FROZEN_FOODS"; }
-  else if (choice === 4) { groupKey = "PHARMACY"; }
-  else if (choice === 5) { groupKey = "NOODLES_SNACKS"; }
-  else { return twiml.message("Invalid option."); }
-
-  await db.ref(`users/${from}`).update({
-    step: 'vendor_select',
-    selected_group: groupKey
-  });
-
-  const vendorKeys = VENDOR_GROUPS[groupKey];
-  let msg = `🏪 *Select ${groupKey.replace('_', ' ')}*\n\n`;
-  
-  vendorKeys.forEach((vKey, index) => {
-    msg += `${index + 1}. ${VENDORS[vKey].name}\n`;
-  });
-  
-  twiml.message(appendCancel(msg));
+async function showCategories(from, twiml) {
+  await db.ref(`users/${from}/step`).set('category_select');
+  let msg = `🍽️ *${VENDOR_NAME} Categories*\n\n`;
+  msg += `1. 🍚 Rice Meals\n2. 🥘 Swallow & Solids\n3. 🍗 Proteins / Add-ons\n\nReply number.`;
+  twiml.message(msg);
 }
 
-async function handleVendorSelect(from, id, twiml) {
-  const userSnap = await db.ref(`users/${from}`).once('value');
-  const user = userSnap.val();
-  const groupKey = user.selected_group;
-  const vendorKeys = VENDOR_GROUPS[groupKey];
-  
-  if (id < 1 || id > vendorKeys.length) {
-      return twiml.message("Invalid option.");
-  }
-
-  const selectedVendorKey = vendorKeys[id - 1];
-  const vendorName = VENDORS[selectedVendorKey].name;
-  
-  await db.ref(`users/${from}`).update({
-    step: 'category_select',
-    selected_vendor: selectedVendorKey
-  });
-  
-  await showCategories(from, twiml, vendorName);
-}
-
-async function showCategories(from, twiml, vendorName) {
-  const userSnap = await db.ref(`users/${from}`).once('value');
-  const user = userSnap.val();
-  const vKey = user.selected_vendor;
-  const vendor = VENDORS[vKey];
-  const categories = Object.keys(vendor.categories);
-
-  let msg = `📂 *${vendorName} Categories*\n\n`;
-  categories.forEach((cat, index) => {
-    msg += `${index + 1}. ${cat.replace(/_/g, ' ')}\n`;
-  });
-  twiml.message(appendCancel(msg));
-}
-
-async function handleCategorySelect(from, msg, twiml) {
-  const userSnap = await db.ref(`users/${from}`).once('value');
-  const user = userSnap.val();
-  const vKey = user.selected_vendor;
-  const vendor = VENDORS[vKey];
-  const categories = Object.keys(vendor.categories);
-  
-  const choice = parseInt(msg);
+async function handleCategorySelect(from, choice, twiml) {
   let categoryKey = '';
-  
-  if (choice > 0 && choice <= categories.length) {
-      categoryKey = categories[choice - 1];
-  } else {
-      return twiml.message("Invalid category. Reply 1, 2, or 3.");
-  }
+  if (choice === 1) categoryKey = 'RICE_MEALS';
+  if (choice === 2) categoryKey = 'SWALLOWS';
+  if (choice === 3) categoryKey = 'PROTEINS';
+
+  if (!categoryKey) return twiml.message("Invalid category. Reply 1, 2, or 3.");
 
   await db.ref(`users/${from}`).update({
     step: 'item_select',
     current_category: categoryKey
   });
 
-  const cat = VENDORS[vKey].categories[categoryKey];
-  let txt = `*${categoryKey.replace('_', ' ')}*\n\n`;
-  cat.forEach(item => {
-    const priceTxt = (item.reg && item.ext) ? (item.reg === item.ext ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`) : formatCurrency(item.price);
-    txt += `${item.id}. ${item.name} - ${priceTxt}\n`;
+  let msg = `*${categoryKey.replace('_', ' ')}*\n\n`;
+  MENU_CATEGORIES[categoryKey].forEach(item => {
+    const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`;
+    msg += `${item.id}. ${item.name} - ${priceTxt}\n`;
   });
-  twiml.message(appendCancel(txt));
+  msg += `\nReply item number.`;
+  twiml.message(msg);
 }
 
 async function handleItemSelect(from, id, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
-  const vKey = user.selected_vendor;
-  const cat = user.current_category;
-  const item = VENDORS[vKey].categories[cat].find(i => i.id === id);
+  const cat = MENU_CATEGORIES[user.current_category];
+  const item = cat.find(i => i.id === id);
 
   if (!item) return twiml.message("Invalid item number.");
   
@@ -1068,13 +381,12 @@ async function handleItemSelect(from, id, twiml) {
     selected_item: item
   });
 
-  if (item.reg && item.ext && item.reg !== item.ext) {
-    let msg = `*${item.name}*\n\nSelect Portion:\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`;
-    twiml.message(appendCancel(msg));
-  } else {
+  if (item.reg === item.ext) {
     await db.ref(`users/${from}/step`).set('quantity_select');
-    const price = item.price || item.reg || item.ext;
-    twiml.message(appendCancel(`*${item.name}*\n\nPrice: ${formatCurrency(price)}\n\nHow many? (Enter number)`));
+    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many? (Enter number)`);
+  } else {
+    let msg = `*${item.name}*\n\nSelect Portion:\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`;
+    twiml.message(msg);
   }
 }
 
@@ -1096,7 +408,7 @@ async function handleSizeSelect(from, msg, twiml) {
     selected_size: label
   });
 
-  twiml.message(appendCancel(`*${item.name} (${label})*\n\nPrice: ${formatCurrency(price)}\n\nHow many? (Enter number)`));
+  twiml.message(`*${item.name} (${label})*\n\nPrice: ${formatCurrency(price)}\n\nHow many? (Enter number)`);
 }
 
 async function handleQuantitySelect(from, msg, twiml) {
@@ -1108,7 +420,7 @@ async function handleQuantitySelect(from, msg, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
   const item = userSnap.val().selected_item;
-  const price = user.selected_item_price || item.price || item.reg;
+  const price = user.selected_item_price || item.reg;
   const size = user.selected_size || (item.reg === item.ext ? 'Regular' : 'Regular');
 
   const newItem = {
@@ -1122,51 +434,40 @@ async function handleQuantitySelect(from, msg, twiml) {
   const cart = user.cart || [];
   cart.push(newItem);
 
-  // Logic: Only ask for protein loop if vendor has proteins and current category isn't proteins
-  const vKey = user.selected_vendor;
-  const vendor = VENDORS[vKey];
-  
-  if (vendor.categories['PROTEINS'] && user.current_category !== 'PROTEINS') {
-      await db.ref(`users/${from}`).update({
-        step: 'protein_loop',
-        cart: cart
-      });
-      twiml.message(appendCancel(`✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`));
+  if (user.current_category !== 'PROTEINS') {
+    await db.ref(`users/${from}`).update({
+      step: 'protein_loop',
+      cart: cart
+    });
+    twiml.message(`✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`);
   } else {
-      await showCartSummary(from, cart, twiml);
+    await showCartSummary(from, cart, twiml);
   }
 }
 
 async function handleProteinLoop(from, msg, twiml) {
-  const userSnap = await db.ref(`users/${from}`).once('value');
-  const user = userSnap.val();
-  const vKey = user.selected_vendor;
-  const vendor = VENDORS[vKey];
-
-  if (msg === '1' && vendor.categories['PROTEINS']) {
-    const cat = vendor.categories['PROTEINS'];
+  if (msg === '1') {
+    const cat = MENU_CATEGORIES['PROTEINS'];
     let txt = `🍗 *Proteins & Sides*\n\n`;
     cat.forEach(item => {
        const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`;
        txt += `${item.id}. ${item.name} - ${priceTxt}\n`;
     });
-    twiml.message(appendCancel(txt));
+    txt += `\nReply item number.`;
     
     await db.ref(`users/${from}/step`).set('protein_select');
-  } else if (msg === '2' || !vendor.categories['PROTEINS']) {
-    await showCartSummary(from, user.cart, twiml);
+    twiml.message(txt);
+  } else if (msg === '2') {
+    const userSnap = await db.ref(`users/${from}`).once('value');
+    await showCartSummary(from, userSnap.val().cart, twiml);
   } else {
     twiml.message("Reply 1 or 2.");
   }
 }
 
 async function handleProteinSelect(from, id, twiml) {
-  const userSnap = await db.ref(`users/${from}`).once('value');
-  const user = userSnap.val();
-  const vKey = user.selected_vendor;
-  const cat = VENDORS[vKey].categories['PROTEINS'];
+  const cat = MENU_CATEGORIES['PROTEINS'];
   const item = cat.find(i => i.id === id);
-  
   if (!item) return twiml.message("Invalid item.");
 
   await db.ref(`users/${from}`).update({
@@ -1176,9 +477,9 @@ async function handleProteinSelect(from, id, twiml) {
 
   if (item.reg === item.ext) {
     await db.ref(`users/${from}/step`).set('protein_qty');
-    twiml.message(appendCancel(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many pieces?`));
+    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many pieces?`);
   } else {
-    twiml.message(appendCancel(`*${item.name}*\n\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`));
+    twiml.message(`*${item.name}*\n\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`);
   }
 }
 
@@ -1194,7 +495,7 @@ async function handleProteinSize(from, msg, twiml) {
     selected_item_price: item[size],
     selected_size: msg === '1' ? 'Regular' : 'Extra'
   });
-  twiml.message(appendCancel(`*${item.name} (${msg === '1' ? 'Regular' : 'Extra'})*\n\nHow many pieces?`));
+  twiml.message(`*${item.name} (${msg === '1' ? 'Regular' : 'Extra'})*\n\nHow many pieces?`);
 }
 
 async function handleProteinQty(from, msg, twiml) {
@@ -1217,7 +518,7 @@ async function handleProteinQty(from, msg, twiml) {
   cart.push(newItem);
 
   await db.ref(`users/${from}`).update({ cart: cart, step: 'protein_loop' });
-  twiml.message(appendCancel(`✅ Added ${qty}x ${item.name}.\n\nAdd another protein?\n1. Yes\n2. No (Checkout)`));
+  twiml.message(`✅ Added ${qty}x ${item.name}.\n\nAdd another protein?\n1. Yes\n2. No (Checkout)`);
 }
 
 async function showCartSummary(from, cart, twiml) {
@@ -1235,7 +536,7 @@ async function showCartSummary(from, cart, twiml) {
     step: 'add_more_or_checkout',
     cart_subtotal: sub
   });
-  twiml.message(appendCancel(txt));
+  twiml.message(txt);
 }
 
 // --- ERRAND & PICKUP HANDLERS ---
@@ -1247,7 +548,8 @@ async function handleErrandType(from, type, twiml) {
   
   if (type === 1) { typeStr = "MARKET"; needsShopping = true; }
   else if (type === 2) { typeStr = "PICK_UP"; isPickup = true; }
-  else if (type === 3) { typeStr = "TASK"; isPickup = true; }
+  else if (type === 3) { typeStr = "PHARMACY"; needsShopping = true; }
+  else if (type === 4) { typeStr = "TASK"; isPickup = true; }
   else return twiml.message("Invalid selection.");
 
   await db.ref(`users/${from}`).update({
@@ -1258,13 +560,13 @@ async function handleErrandType(from, type, twiml) {
 
   if (isPickup) {
     await db.ref(`users/${from}/step`).set('pickup_description');
-    twiml.message(appendCancel("📝 *Describe task or pickup details:*\n(e.g., Get a bag of drink at Tarmac)"));
+    twiml.message("📝 *Describe the task or pickup details:*\n(e.g., Get a bag of drink at Tarmac)");
   } else if (needsShopping) {
     await db.ref(`users/${from}/step`).set('errand_details');
-    twiml.message(appendCancel(`📝 *List items you want to buy.*\n\nFormat: Item Price, Item Price\nExample: Beans 2000, Oil 500`));
+    twiml.message(`📝 *List the items you want to buy.*\n\nFormat: Item Price, Item Price\nExample: Beans 2000, Oil 500`);
   } else {
     await db.ref(`users/${from}/step`).set('pickup_description');
-    twiml.message(appendCancel("📝 *Describe task:*"));
+    twiml.message("📝 *Describe the task:*");
   }
 }
 
@@ -1296,7 +598,7 @@ async function handleErrandDetails(from, text, twiml) {
   let msg = `✅ Items saved:\n`;
   items.forEach(i => msg += `- ${i.name}: ${formatCurrency(i.price)}\n`);
   msg += `\nTotal Items Cost: ${formatCurrency(budget)}\n\n📝 Next, please provide your Name.`;
-  twiml.message(appendCancel(msg));
+  twiml.message(msg);
 }
 
 // --- NEW PICKUP FLOW FUNCTIONS ---
@@ -1307,7 +609,7 @@ async function handlePickupDescription(from, text, twiml) {
         step: 'vendor_name',
         errand_description: text
     });
-    twiml.message(appendCancel("👤 *Who are we picking from?*\n\nPlease provide the Name of the person or shop."));
+    twiml.message("👤 *Who are we picking from?*\n\nPlease provide the Name of the person or shop.");
 }
 
 async function handleVendorName(from, text, twiml) {
@@ -1316,7 +618,7 @@ async function handleVendorName(from, text, twiml) {
         step: 'vendor_phone',
         vendor_name: text
     });
-    twiml.message(appendCancel("📞 *What is their Phone Number?*\n(We need to contact them)."));
+    twiml.message("📞 *What is their Phone Number?*\n(We need to contact them).");
 }
 
 async function handleVendorPhone(from, text, twiml) {
@@ -1327,7 +629,7 @@ async function handleVendorPhone(from, text, twiml) {
         step: 'customer_name',
         vendor_phone: cleanPhone
     });
-    twiml.message(appendCancel("👤 *What is YOUR Name?* (Customer Name)"));
+    twiml.message("👤 *What is YOUR Name?* (Customer Name)");
 }
 
 // --- GENERAL CHECKOUT FLOW HANDLERS ---
@@ -1338,7 +640,7 @@ async function handleCustomerName(from, text, twiml) {
         step: 'customer_phone',
         customer_name: text
     });
-    twiml.message(appendCancel("📞 Please share YOUR Phone Number (e.g. 08012345678)."));
+    twiml.message("📞 Please share YOUR Phone Number (e.g. 08012345678).");
 }
 
 async function handleCustomerPhone(from, text, twiml) {
@@ -1352,13 +654,11 @@ async function handleCustomerPhone(from, text, twiml) {
 
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
-    const vKey = user.selected_vendor;
 
-    if (user.order_type === 'food' && vKey) {
-        const vendor = VENDORS[vKey];
-        twiml.message(appendCancel(`📍 *Where is the Pickup Location?*\n\n1. ${vendor.name} (Default)\n2. Type a different address\n\nReply 1 or 2.`));
+    if (user.order_type === 'food') {
+        twiml.message(`📍 *Where is the Pickup Location?*\n\n1. ${VENDOR_NAME} (Default)\n2. Type a different address\n\nReply 1 or 2.`);
     } else {
-        twiml.message(appendCancel("📍 *Where is the Pickup Location?*\n\n(e.g. Tarmac, School Road, Westend, Safari)"));
+        twiml.message("📍 *Where is the Pickup Location?*\n\n(e.g. Tarmac, School Road, Westend, Safari)");
     }
 }
 
@@ -1366,20 +666,19 @@ async function handlePickupLocation(from, text, twiml) {
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
     let location = text;
-    const vKey = user.selected_vendor;
 
-    if (user.order_type === 'food' && vKey && text.trim() === '1') {
-        location = VENDORS[vKey].address;
+    if (user.order_type === 'food' && text.trim() === '1') {
+        location = VENDOR_ADDRESS;
     } else if (user.order_type === 'food' && text.trim() === '2') {
         await db.ref(`users/${from}/step`).set('pickup_location_manual');
-        return twiml.message(appendCancel("📍 Please type the specific pickup address:"));
+        return twiml.message("📍 Please type the specific pickup address:");
     }
 
     await db.ref(`users/${from}`).update({
         step: 'delivery_location',
         pickup_location: location
     });
-    twiml.message(appendCancel("📍 Where should the rider drop the items? (Your Hostel/Room/Address)"));
+    twiml.message("📍 Where should the rider drop the items? (Your Hostel/Room/Address)");
 }
 
 async function handleDeliveryLocation(from, text, twiml) {
@@ -1402,14 +701,11 @@ async function generateOrderSummary(from, twiml) {
     if (user.vendor_name) {
         summary += `🏪 Pickup From: ${user.vendor_name}\n`;
         summary += `📞 Vendor Phone: ${user.vendor_phone}\n\n`;
-    } else if (user.selected_vendor) {
-        summary += `🏪 Vendor: ${VENDORS[user.selected_vendor].name}\n\n`;
     }
 
-    // FIX: Use safe fallback for cart
     if (user.order_type === 'food') {
         total = user.cart_subtotal || 0;
-        (user.cart || []).forEach(c => {
+        user.cart.forEach(c => {
             summary += `${c.name} (${c.size}) x${c.qty}\n`;
         });
         summary += `\nFood Cost: ${formatCurrency(total)}`;
@@ -1436,7 +732,8 @@ async function generateOrderSummary(from, twiml) {
 
     await db.ref(`users/${from}`).update({ final_total: total });
 
-    twiml.message(appendCancel(summary));
+    summary += `\n\nReply "CONFIRM" to proceed to payment.`;
+    twiml.message(summary);
 }
 
 async function handleFinalConfirm(from, msg, twiml) {
@@ -1459,13 +756,8 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
   const total = user.final_total;
   
   let orderDetails = [];
-  let vendorName = "Errand/General";
-
-  if (user.selected_vendor) {
-      vendorName = VENDORS[user.selected_vendor].name;
-      if (user.cart) {
-          orderDetails = user.cart;
-      }
+  if (user.order_type === 'food') {
+      orderDetails = user.cart;
   } else if (user.errand_items) {
       orderDetails = user.errand_items;
   } else {
@@ -1477,13 +769,13 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
     customer: from,
     customer_name: user.customer_name,
     customer_phone: user.customer_phone,
-    vendor_name: vendorName, // Added Vendor Name
     type: user.order_type,
     status: 'pending_payment',
     total: total,
     delivery_loc: user.delivery_location,
     pickup_loc: user.pickup_location,
     details: orderDetails,
+    vendor_name: user.vendor_name || null,
     vendor_phone: user.vendor_phone || null,
     timestamp: admin.database.ServerValue.TIMESTAMP
   };
@@ -1495,7 +787,7 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
       last_order_id: orderId 
   });
 
-  twiml.message(appendCancel(`✅ *Order Received!*\n\nYour Order #${orderId} is worth ${formatCurrency(total)}.\n\nWe are verifying your payment now. You will be notified shortly.`));
+  twiml.message(`✅ *Order Received!*\n\nYour Order #${orderId} is worth ${formatCurrency(total)}.\n\nWe are verifying your payment now. You will be notified shortly.`);
 
   try {
     const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -1506,7 +798,7 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
     }
 
     let itemsList = "";
-    if (user.order_type === 'food' && user.cart) {
+    if (user.order_type === 'food') {
       user.cart.forEach(c => itemsList += `- ${c.name} (${c.size}) x${c.qty}\n`);
     } else {
       if (user.errand_items) {
@@ -1516,9 +808,13 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
       }
     }
 
+    let vendorInfo = "";
+    if (user.vendor_name) {
+        vendorInfo = `\n🏪 Vendor: ${user.vendor_name}\n📞 Vendor Phone: ${user.vendor_phone}\n`;
+    }
+
     const adminMsg = `💳 *NEW PAYMENT ALERT*\n\n` +
                     `Order ID: #${orderId}\n` +
-                    `Vendor: ${vendorName}\n` +
                     `Type: ${user.order_type.toUpperCase()}\n` +
                     `Customer: ${user.customer_name}\n` +
                     `Phone: ${user.customer_phone}\n` +
@@ -1526,6 +822,7 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
                     `Delivery: ${user.delivery_location}\n` +
                     `Total: ${formatCurrency(total)}\n\n` +
                     `Items:\n${itemsList}` +
+                    `${vendorInfo}` +
                     `\n[Check WhatsApp for Screenshot]`;
 
     const messageOptions = {
@@ -1648,7 +945,7 @@ async function handleRateRider(from, msg, twiml) {
     const orderId = user.last_order_id;
     await db.ref(`orders/${orderId}/rating/rider`).set(rating);
     await db.ref(`users/${from}`).update({ step: 'rate_service' });
-    twiml.message("Thanks! How would you rate ChowZone service? (1-5 stars)");
+    twiml.message(`Thanks! How would you rate ChowZone service? (1-5 stars)`);
 }
 
 async function handleRateService(from, msg, twiml) {
@@ -1671,9 +968,11 @@ async function broadcastToRiders(orderId, order) {
   const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   
   let itemsSummary = "";
-  if (order.details) {
-      order.details.forEach(d => itemsSummary += `${d.name} x${d.qty || 1}, `);
+  if (order.type === 'food') {
+      order.details.forEach(d => itemsSummary += `${d.name} x${d.qty}, `);
       itemsSummary = itemsSummary.slice(0, -2);
+  } else {
+      itemsSummary = order.details[0].name;
   }
 
   let msg = `🛵 NEW JOB #${orderId}\n`;
@@ -1681,7 +980,7 @@ async function broadcastToRiders(orderId, order) {
   msg += `Phone: ${order.customer_phone}\n`;
   
   if (order.vendor_name) {
-      msg += `Vendor: ${order.vendor_name}\n`;
+      msg += `Picking from: ${order.vendor_name} (${order.vendor_phone})\n`;
   }
   
   msg += `Pickup: ${order.pickup_loc}\n`;
