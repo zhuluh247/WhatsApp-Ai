@@ -34,7 +34,19 @@ const ADMIN_PHONE = process.env.ADMIN_PHONE;
 const RIDER_REG_CODE = process.env.RIDER_REG_CODE;
 const DELIVERY_FEE = parseInt(process.env.DELIVERY_FEE) || 500;
 const SHOPPING_FEE = parseInt(process.env.SHOPPING_FEE) || 500;
-const SUPPORT_PHONE = "+2349138765380"; 
+const SUPPORT_PHONE = "+2349138765380";
+
+// Initialize Twilio Client Globally
+const client = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+// --- HELPER: FORMAT NUMBERS FOR WHATSAPP SANDBOX ---
+// Ensures the number always starts with 'whatsapp:' to avoid Sandbox errors
+function formatWhatsappNumber(number) {
+  if (!number) return number;
+  // Remove existing 'whatsapp:' prefix if present, trim whitespace
+  let clean = number.replace(/whatsapp:/g, '').trim();
+  return `whatsapp:${clean}`;
+}
 
 // --- 4. MENU DATA (21 VENDORS) ---
 const FREE_SOUPS = ["Egusi", "Okro", "Ewedu", "Vegetable", "Gbegiri", "Gbegiri & Ewedu"];
@@ -72,7 +84,7 @@ const VENDORS = [
         { id: 20, name: "Assorted", reg: 500, ext: 1000 },
         { id: 21, name: "Goat Meat", reg: 500, ext: 1000 },
         { id: 22, name: "Ponmo", reg: 200, ext: 500 },
-        { id: 23, name: "Beef", reg: 500, ext: 500 }, 
+        { id: 23, name: "Beef", reg: 500, ext: 500 },
         { id: 24, name: "Egg", reg: 300, ext: 300 }
       ]
     }
@@ -80,7 +92,7 @@ const VENDORS = [
   {
     id: "tee_jay",
     name: "Tee Jay Frozen Food",
-    address: "Tee Jay Location", // Update if needed
+    address: "Tee Jay Location",
     categories: {
       "Fish Per Kilo": [
         { id: 1, name: "Shawa", reg: 3400, ext: 3400 },
@@ -117,7 +129,7 @@ const VENDORS = [
   {
     id: "biggy_shack",
     name: "BIGGY’S SHACK SHARWAMA",
-    address: "Biggy Location", 
+    address: "Biggy Location",
     categories: {
       "Sharwama & Combos": [
         { id: 1, name: "Double sausage chicken", reg: 3000, ext: 3000 },
@@ -185,7 +197,7 @@ const VENDORS = [
         { id: 6, name: "DELIGHT (Noodles w/ Egg, sardine)", reg: 3150, ext: 3150 },
         { id: 7, name: "BANGER (Noodles w/ Egg, sausage)", reg: 2650, ext: 2650 },
         { id: 8, name: "CLASSIC (Noodles w/ Egg)", reg: 1850, ext: 1850 },
-        { id: 9, name: "PLANTAIN PLATTER (Plantain, Egg/Sausage)", reg: 0, ext: 0 } // Price missing, set to 0
+        { id: 9, name: "PLANTAIN PLATTER (Plantain, Egg/Sausage)", reg: 0, ext: 0 }
       ]
     }
   },
@@ -319,8 +331,8 @@ const VENDORS = [
         { id: 16, name: "Jumbo bread sharwama", reg: 3500, ext: 3500 },
         { id: 17, name: "Sandwich", reg: 700, ext: 700 },
         { id: 18, name: "Royal pizza", reg: 10000, ext: 10000 },
-        { id: 19, name: "Barbecue", reg: 4000, ext: 6500 }, // S/M/L
-        { id: 20, name: "Nkwobi", reg: 4000, ext: 6000 } // Small/Large
+        { id: 19, name: "Barbecue", reg: 4000, ext: 6500 },
+        { id: 20, name: "Nkwobi", reg: 4000, ext: 6000 }
       ]
     }
   },
@@ -522,12 +534,12 @@ const VENDORS = [
         { id: 23, name: "Oreo Milkshake", reg: 7000, ext: 7000 },
         { id: 24, name: "Strawberry Milkshake", reg: 7000, ext: 7000 },
         { id: 25, name: "Banana Milkshake", reg: 7000, ext: 7000 },
-        { id: 26, name: "Beef Pizza", reg: 6000, ext: 10000 }, // S/L
-        { id: 27, name: "Chicken Pizza", reg: 6000, ext: 10000 }, // S/L
-        { id: 28, name: "Margherita Pizza", reg: 6000, ext: 10000 }, // S/L
-        { id: 29, name: "Pepperoni Pizza", reg: 7000, ext: 11000 }, // S/L
-        { id: 30, name: "BBQ Pizza", reg: 8000, ext: 12000 }, // S/L
-        { id: 31, name: "Supreme Pizza", reg: 10000, ext: 16000 } // S/L
+        { id: 26, name: "Beef Pizza", reg: 6000, ext: 10000 },
+        { id: 27, name: "Chicken Pizza", reg: 6000, ext: 10000 },
+        { id: 28, name: "Margherita Pizza", reg: 6000, ext: 10000 },
+        { id: 29, name: "Pepperoni Pizza", reg: 7000, ext: 11000 },
+        { id: 30, name: "BBQ Pizza", reg: 8000, ext: 12000 },
+        { id: 31, name: "Supreme Pizza", reg: 10000, ext: 16000 }
       ]
     }
   },
@@ -723,8 +735,8 @@ app.post('/whatsapp', async (req, res) => {
   const twiml = new twilio.twiml.MessagingResponse();
   const from = req.body.From;
   const body = (req.body.Body || '').trim();
-  const msg = body.toLowerCase(); 
-  const originalMsg = body; 
+  const msg = body.toLowerCase();
+  const originalMsg = body;
   const numMedia = parseInt(req.body.NumMedia) || 0;
 
   console.log(`[${new Date().toISOString()}] From: ${from}, Msg: ${body}, Media: ${numMedia}`);
@@ -740,7 +752,7 @@ app.post('/whatsapp', async (req, res) => {
     if (numMedia > 0) {
       const userSnap = await db.ref(`users/${from}`).once('value');
       const user = userSnap.val();
-      
+
       if (user && user.step === 'awaiting_payment') {
         await createOrderInDB(from, user, twiml, req.body.MediaUrl0);
         return res.type('text/xml').send(twiml.toString());
@@ -784,7 +796,7 @@ app.post('/whatsapp', async (req, res) => {
     if (orderId) {
         const orderSnap = await db.ref(`orders/${orderId}`).once('value');
         const order = orderSnap.val();
-        
+
         if (order && (order.status === 'pending_payment' || order.status === 'seeking_rider' || order.status === 'rider_accepted')) {
             let msg = "";
             if (order.status === 'pending_payment') {
@@ -800,7 +812,7 @@ app.post('/whatsapp', async (req, res) => {
     }
 
     // --- D. ADMIN COMMANDS ---
-    if (from === ADMIN_PHONE) {
+    if (from === ADMIN_PHONE || formatWhatsappNumber(from) === formatWhatsappNumber(ADMIN_PHONE)) {
       if (msg.startsWith('approve ')) {
         const orderId = msg.split(' ')[1];
         await approveOrder(orderId);
@@ -894,7 +906,7 @@ app.post('/whatsapp', async (req, res) => {
         break;
       case 'add_more_or_checkout':
         if (msg === '1') {
-           await showCategories(from, twiml); 
+           await showCategories(from, twiml);
         } else if (msg === '2') {
            await db.ref(`users/${from}`).update({ step: 'customer_name' });
            twiml.message("📝 Please provide your Full Name.");
@@ -925,6 +937,9 @@ app.post('/whatsapp', async (req, res) => {
         break;
       case 'pickup_location':
         await handlePickupLocation(from, originalMsg, twiml);
+        break;
+      case 'pickup_location_manual': // ADDED MISSING CASE
+        await handlePickupLocationManual(from, originalMsg, twiml);
         break;
       case 'delivery_location':
         await handleDeliveryLocation(from, originalMsg, twiml);
@@ -991,7 +1006,7 @@ async function handleMainMenu(from, msg, twiml) {
 
 async function showCategories(from, twiml) {
   await db.ref(`users/${from}/step`).set('category_select');
-  
+
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
   const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
@@ -1003,11 +1018,11 @@ async function showCategories(from, twiml) {
 
   let msg = `🍽️ *${vendor.name} Categories*\n\n`;
   const catKeys = Object.keys(vendor.categories);
-  
+
   catKeys.forEach((key, index) => {
     msg += `${index + 1}. ${key.replace('_', ' ')}\n`;
   });
-  
+
   msg += `\nReply number.`;
   twiml.message(msg);
 }
@@ -1016,7 +1031,7 @@ async function handleCategorySelect(from, choice, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
   const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
-  
+
   const catKeys = Object.keys(vendor.categories);
   const selectedKey = catKeys[choice - 1];
 
@@ -1040,12 +1055,12 @@ async function handleItemSelect(from, id, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
   const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
-  
+
   const cat = vendor.categories[user.current_category];
   const item = cat.find(i => i.id === id);
 
   if (!item) return twiml.message("Invalid item number.");
-  
+
   await db.ref(`users/${from}`).update({
     step: 'size_select',
     selected_item: item
@@ -1063,7 +1078,7 @@ async function handleItemSelect(from, id, twiml) {
 async function handleSizeSelect(from, msg, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const item = userSnap.val().selected_item;
-  
+
   if (msg !== '1' && msg !== '2') {
       return twiml.message("Invalid choice. Reply 1 for Regular or 2 for Extra.");
   }
@@ -1095,7 +1110,8 @@ async function handleQuantitySelect(from, msg, twiml) {
   const currentCategory = user.current_category;
 
   // Logic for Swallows + Free Soup
-  if (currentCategory.includes('Swallow') || currentCategory === 'SWALLOWS') {
+  // Use toLowerCase() to catch both "SWALLOWS" and "Swallows"
+  if (currentCategory.toLowerCase().includes('swallow')) {
       // Save the item details temporarily
       const tempItem = {
           name: item.name,
@@ -1125,13 +1141,13 @@ async function handleQuantitySelect(from, msg, twiml) {
     price: price,
     qty: qty,
     size: size,
-    type: currentCategory.includes('Protein') ? 'protein' : 'main'
+    type: currentCategory.toLowerCase().includes('protein') ? 'protein' : 'main'
   };
 
   const cart = user.cart || [];
   cart.push(newItem);
 
-  if (!currentCategory.includes('Protein')) {
+  if (!currentCategory.toLowerCase().includes('protein')) {
     await db.ref(`users/${from}`).update({
       step: 'protein_loop',
       cart: cart
@@ -1179,10 +1195,10 @@ async function handleProteinLoop(from, msg, twiml) {
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
     const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
-    
+
     // Fallback to a standard protein category if specific vendor doesn't have one defined
     let proteinCat = vendor.categories["PROTEINS"] || vendor.categories["Proteins"] || vendor.categories["Protein"];
-    
+
     if (!proteinCat) {
         twiml.message("This vendor doesn't have specific protein addons. Going to checkout.");
         return showCartSummary(from, userSnap.val().cart, twiml);
@@ -1194,17 +1210,11 @@ async function handleProteinLoop(from, msg, twiml) {
        txt += `${item.id}. ${item.name} - ${priceTxt}\n`;
     });
     txt += `\nReply item number.`;
-    
-    // Set a flag that we are in a secondary protein selection to handle ID collisions properly if needed
-    // For simplicity, we just assume IDs are unique enough or we match by name.
-    // However, `handleProteinSelect` relies on `current_category`. 
-    // We need to trick it slightly or modify `handleProteinSelect`. 
-    // Simplest way: Set `current_category` to the key of the protein category.
-    
+
     // Find the key for the proteins
     const catKeys = Object.keys(vendor.categories);
     const proteinKey = catKeys.find(k => k.toLowerCase().includes('protein'));
-    
+
     if(proteinKey) {
         await db.ref(`users/${from}`).update({
             step: 'protein_select',
@@ -1227,9 +1237,9 @@ async function handleProteinSelect(from, id, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
   const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
-  
+
   const cat = vendor.categories[user.current_category];
-  if(!cat) return showCartSummary(from, user.cart, twiml); // Fallback if vendor has no proteins
+  if(!cat) return showCartSummary(from, user.cart, twiml); // Fallback
 
   const item = cat.find(i => i.id === id);
   if (!item) return twiml.message("Invalid item.");
@@ -1253,7 +1263,7 @@ async function handleProteinSize(from, msg, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const item = userSnap.val().selected_item;
   const size = msg === '1' ? 'reg' : 'ext';
-  
+
   await db.ref(`users/${from}`).update({
     step: 'protein_qty',
     selected_item_price: item[size],
@@ -1269,7 +1279,7 @@ async function handleProteinQty(from, msg, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
   const item = userSnap.val().selected_item;
-  
+
   const newItem = {
     name: item.name,
     price: user.selected_item_price,
@@ -1309,7 +1319,7 @@ async function handleErrandType(from, type, twiml) {
   let typeStr = "";
   let needsShopping = false;
   let isPickup = false;
-  
+
   if (type === 1) { typeStr = "MARKET"; needsShopping = true; }
   else if (type === 2) { typeStr = "PICK_UP"; isPickup = true; }
   else if (type === 3) { typeStr = "PHARMACY"; needsShopping = true; }
@@ -1386,7 +1396,7 @@ async function handleVendorName(from, text, twiml) {
 async function handleVendorPhone(from, text, twiml) {
     const cleanPhone = text.replace(/\D/g,'');
     if (cleanPhone.length < 10) return twiml.message("⚠️ Invalid phone number.");
-    
+
     await db.ref(`users/${from}`).update({
         step: 'customer_name',
         vendor_phone: cleanPhone
@@ -1430,7 +1440,7 @@ async function handlePickupLocation(from, text, twiml) {
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
     const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
-    
+
     let location = text;
 
     if (user.order_type === 'food' && text.trim() === '1') {
@@ -1443,6 +1453,16 @@ async function handlePickupLocation(from, text, twiml) {
     await db.ref(`users/${from}`).update({
         step: 'delivery_location',
         pickup_location: location
+    });
+    twiml.message("📍 Where should the rider drop the items? (Your Hostel/Room/Address)");
+}
+
+// ADDED: Handle manual pickup location entry
+async function handlePickupLocationManual(from, text, twiml) {
+    if (!text || text.trim().length === 0) return twiml.message("⚠️ Address cannot be empty.");
+    await db.ref(`users/${from}`).update({
+        step: 'delivery_location',
+        pickup_location: text.trim()
     });
     twiml.message("📍 Where should the rider drop the items? (Your Hostel/Room/Address)");
 }
@@ -1520,7 +1540,7 @@ async function handleFinalConfirm(from, msg, twiml) {
 async function createOrderInDB(from, user, twiml, mediaUrl) {
   const orderId = generateId();
   const total = user.final_total;
-  
+
   let orderDetails = [];
   if (user.order_type === 'food') {
       orderDetails = user.cart;
@@ -1547,21 +1567,18 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
   };
 
   await db.ref(`orders/${orderId}`).set(orderData);
-  
-  await db.ref(`users/${from}`).update({ 
+
+  await db.ref(`users/${from}`).update({
       step: 'new',
-      last_order_id: orderId 
+      last_order_id: orderId
   });
 
   twiml.message(`✅ *Order Received!*\n\nYour Order #${orderId} is worth ${formatCurrency(total)}.\n\nWe are verifying your payment now. You will be notified shortly.`);
 
   try {
-    const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    
-    let adminPhone = ADMIN_PHONE;
-    if (!adminPhone.startsWith('whatsapp:')) {
-      adminPhone = `whatsapp:${adminPhone}`;
-    }
+    // ENSURE PROPER FORMATTING
+    const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
+    const adminPhone = formatWhatsappNumber(ADMIN_PHONE);
 
     let itemsList = "";
     if (user.order_type === 'food') {
@@ -1592,8 +1609,8 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
                     `\n[Check WhatsApp for Screenshot]`;
 
     const messageOptions = {
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: adminPhone,
+      from: fromNumber, // FORMATTED
+      to: adminPhone,   // FORMATTED
       body: adminMsg
     };
 
@@ -1613,11 +1630,12 @@ async function approveOrder(orderId) {
   if (!order) return;
 
   await db.ref(`orders/${orderId}/status`).set('seeking_rider');
-  
-  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  
+
+  // ENSURE PROPER FORMATTING
+  const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
+
   await client.messages.create({
-    from: process.env.TWILIO_PHONE_NUMBER,
+    from: fromNumber, // FORMATTED
     to: order.customer,
     body: `✅ *Payment Verified*\n\nYour Order #${orderId} has been placed! We are assigning a rider now.`
   });
@@ -1632,9 +1650,11 @@ async function rejectOrder(orderId) {
 
   await db.ref(`orders/${orderId}/status`).set('rejected');
 
-  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  // ENSURE PROPER FORMATTING
+  const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
+
   await client.messages.create({
-    from: process.env.TWILIO_PHONE_NUMBER,
+    from: fromNumber, // FORMATTED
     to: order.customer,
     body: `❌ *Payment Not Found*\n\nWe could not verify your payment for Order #${orderId}. Please contact Admin or try again.`
   });
@@ -1643,7 +1663,7 @@ async function rejectOrder(orderId) {
 async function acceptOrder(riderPhone, orderId, twiml) {
   const snap = await db.ref(`orders/${orderId}`).once('value');
   const order = snap.val();
-  
+
   if (order.status !== 'seeking_rider') return twiml.message("Job already taken or closed.");
 
   const riderSnap = await db.ref(`riders/${riderPhone}`).once('value');
@@ -1657,7 +1677,9 @@ async function acceptOrder(riderPhone, orderId, twiml) {
 
   twiml.message(`✅ You have accepted Order #${orderId}. Wait for Admin to contact you regarding payment details.`);
 
-  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  // ENSURE PROPER FORMATTING
+  const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
+  const adminPhone = formatWhatsappNumber(ADMIN_PHONE);
 
   const adminMsg = `🛵 *RIDER ACCEPTED JOB*\n\n` +
                   `Order #${orderId}\n` +
@@ -1666,13 +1688,13 @@ async function acceptOrder(riderPhone, orderId, twiml) {
                   `Please contact rider to arrange details and send the order payment to his account manually.`;
 
   await client.messages.create({
-    from: process.env.TWILIO_PHONE_NUMBER,
-    to: ADMIN_PHONE,
+    from: fromNumber, // FORMATTED
+    to: adminPhone,   // FORMATTED
     body: adminMsg
   });
 
   await client.messages.create({
-    from: process.env.TWILIO_PHONE_NUMBER,
+    from: fromNumber, // FORMATTED
     to: order.customer,
     body: `🛵 *Rider Assigned*\n\nOrder #${orderId}\nRider Name: ${rider.name}\nRider Phone: ${riderPhone}\n\nExpect delivery shortly.`
   });
@@ -1684,18 +1706,19 @@ async function updateOrderStatus(orderId, status, twiml, from) {
   if (order.rider_phone !== from) return twiml.message("Not your order.");
 
   await db.ref(`orders/${orderId}/status`).set(status);
-  
+
   if (status === 'delivered') {
-    const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    
+    // ENSURE PROPER FORMATTING
+    const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
+
     await db.ref(`users/${order.customer}`).update({ step: 'rate_rider' });
-    
+
     await client.messages.create({
-      from: process.env.TWILIO_PHONE_NUMBER,
+      from: fromNumber, // FORMATTED
       to: order.customer,
       body: `✅ *Order Delivered!*\n\nOrder #${orderId} is complete.\n\nPlease rate your Rider (1-5 stars):`
     });
-    
+
     twiml.message(`✅ Order #${orderId} marked as Delivered. Good job!`);
   }
 }
@@ -1730,9 +1753,10 @@ async function handleRateService(from, msg, twiml) {
 async function broadcastToRiders(orderId, order) {
   const ridersSnap = await db.ref('riders').orderByChild('status').equalTo('on_duty').once('value');
   const riders = ridersSnap.val();
-  
-  const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  
+
+  // ENSURE PROPER FORMATTING
+  const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
+
   let itemsSummary = "";
   if (order.type === 'food') {
       order.details.forEach(d => itemsSummary += `${d.name} x${d.qty}, `);
@@ -1744,11 +1768,11 @@ async function broadcastToRiders(orderId, order) {
   let msg = `🛵 NEW JOB #${orderId}\n`;
   msg += `Customer: ${order.customer_name}\n`;
   msg += `Phone: ${order.customer_phone}\n`;
-  
+
   if (order.vendor_name) {
       msg += `Picking from: ${order.vendor_name} (${order.vendor_phone})\n`;
   }
-  
+
   msg += `Pickup: ${order.pickup_loc}\n`;
   msg += `Dropoff: ${order.delivery_loc}\n`;
   msg += `Items: ${itemsSummary}\n`;
@@ -1761,7 +1785,7 @@ async function broadcastToRiders(orderId, order) {
       const rider = riders[key];
       if (rider.phone) {
         client.messages.create({
-          from: process.env.TWILIO_PHONE_NUMBER,
+          from: fromNumber, // FORMATTED
           to: rider.phone,
           body: msg
         }).then(message => console.log(message.sid))
