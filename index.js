@@ -731,6 +731,16 @@ function formatCurrency(amount) {
   return `₦${amount.toLocaleString()}`;
 }
 
+// Helper to append instructions to messages
+function sendResponse(twiml, message, showInstructions = true) {
+  let finalMessage = message;
+  if (showInstructions) {
+    finalMessage += `\n\n(Text '0' to go back to previous step)`;
+    finalMessage += `\n(Text 'Menu' to go to Main Menu)`;
+  }
+  twiml.message(finalMessage);
+}
+
 // Helper to handle Back Navigation logic
 async function goBackStep(from, user, twiml) {
   const map = {
@@ -774,17 +784,17 @@ async function goBackStep(from, user, twiml) {
     let menuText = `🏪 *Select a Vendor*\n\n`;
     VENDORS.forEach((v, index) => menuText += `${index + 1}. ${v.name}\n`);
     menuText += `\nReply with the vendor number.`;
-    twiml.message(menuText);
+    sendResponse(twiml, menuText, true);
   } else if (prevStep === 'category_select') {
     await showCategories(from, twiml);
   } else if (prevStep === 'quantity_select') {
     // If going back to item select, we need to show items
     await handleCategorySelect(from, (Object.keys(VENDORS.find(v=>v.id===user.selected_vendor_id).categories).indexOf(user.current_category) + 1), twiml);
   } else if (prevStep === 'errand_type') {
-     twiml.message(`🏃 *Select Errand Type*\n\n1. 🛒 Market Shopping\n2. 📦 Pick Up Item\n3. 💊 Pharmacy / Supermarket\n4. 📝 Campus Task\n\nReply with number.`);
+     sendResponse(twiml, `🏃 *Select Errand Type*\n\n1. 🛒 Market Shopping\n2. 📦 Pick Up Item\n3. 💊 Pharmacy / Supermarket\n4. 📝 Campus Task\n\nReply with number.`, true);
   } else {
     // Generic fallback for form steps
-    twiml.message("⬅️ Going back to the previous step...");
+    sendResponse(twiml, "⬅️ Going back to the previous step...", true);
   }
 }
 
@@ -838,7 +848,7 @@ app.post('/whatsapp', async (req, res) => {
         await createOrderInDB(from, user, twiml, req.body.MediaUrl0);
         return res.type('text/xml').send(twiml.toString());
       } else {
-        twiml.message("Please complete the text steps first. Reply 'Menu' to restart.");
+        sendResponse(twiml, "Please complete the text steps first. Reply 'Menu' to restart.", false);
         return res.type('text/xml').send(twiml.toString());
       }
     }
@@ -856,9 +866,9 @@ app.post('/whatsapp', async (req, res) => {
           phone: from,
           joined_at: new Date().toISOString()
         });
-        twiml.message(`✅ Registration Successful!\n\nWelcome ${riderName}. Text "ON DUTY" to start.`);
+        sendResponse(twiml, `✅ Registration Successful!\n\nWelcome ${riderName}. Text "ON DUTY" to start.`, false);
       } else {
-        twiml.message('❌ Invalid Registration Code.');
+        sendResponse(twiml, '❌ Invalid Registration Code.', false);
       }
       return res.type('text/xml').send(twiml.toString());
     }
@@ -963,7 +973,7 @@ app.post('/whatsapp', async (req, res) => {
             });
             await showCategories(from, twiml);
         } else {
-            twiml.message("Invalid vendor number. Please try again.");
+            sendResponse(twiml, "Invalid vendor number. Please try again.", true);
         }
         break;
       case 'category_select':
@@ -998,9 +1008,9 @@ app.post('/whatsapp', async (req, res) => {
            await showCategories(from, twiml);
         } else if (msg === '2') {
            await db.ref(`users/${from}`).update({ step: 'customer_name' });
-           twiml.message("📝 Please provide your Full Name.");
+           sendResponse(twiml, "📝 Please provide your Full Name.", true);
         } else {
-           twiml.message("Reply 1 or 2.");
+           sendResponse(twiml, "Reply 1 or 2.", true);
         }
         break;
       case 'errand_type':
@@ -1043,7 +1053,7 @@ app.post('/whatsapp', async (req, res) => {
         await handleRateService(from, msg, twiml);
         break;
       default:
-        twiml.message("I didn't understand that. Reply 'Menu' to restart.");
+        sendResponse(twiml, "I didn't understand that. Reply 'Menu' to restart.", true);
     }
 
     res.type('text/xml').send(twiml.toString());
@@ -1065,7 +1075,7 @@ async function resetUser(from, twiml) {
     errand_data: {},
     last_order_id: null // Ensure order is cleared on reset
   });
-  const welcomeMsg = `🍽️ *Welcome to ChowZone!*\n\nHow can we help you today?\n\n1. Order Food\n2. Errands (Market/Pharmacy/Pickup)\n\nReply with number 1 or 2.\n(Text 'Cancel' anytime to restart)`;
+  const welcomeMsg = `🍽️ *Welcome to ChowZone!*\n\nHow can we help you today?\n\n1. Order Food\n2. Errands (Market/Pharmacy/Pickup)\n\nReply with number 1 or 2.`;
   twiml.message(welcomeMsg);
 }
 
@@ -1081,16 +1091,16 @@ async function handleMainMenu(from, msg, twiml) {
       menuText += `${index + 1}. ${v.name}\n`;
     });
     menuText += `\nReply with the vendor number.`;
-    twiml.message(menuText);
+    sendResponse(twiml, menuText, true);
 
   } else if (msg === '2') {
     await db.ref(`users/${from}`).update({
       step: 'errand_type',
       order_type: 'errand'
     });
-    twiml.message(`🏃 *Select Errand Type*\n\n1. 🛒 Market Shopping\n2. 📦 Pick Up Item\n3. 💊 Pharmacy / Supermarket\n4. 📝 Campus Task\n\nReply with number.`);
+    sendResponse(twiml, `🏃 *Select Errand Type*\n\n1. 🛒 Market Shopping\n2. 📦 Pick Up Item\n3. 💊 Pharmacy / Supermarket\n4. 📝 Campus Task\n\nReply with number.`, true);
   } else {
-    twiml.message("Invalid option. Reply 1 or 2.");
+    sendResponse(twiml, "Invalid option. Reply 1 or 2.", true);
   }
 }
 
@@ -1114,7 +1124,7 @@ async function showCategories(from, twiml) {
   });
 
   msg += `\nReply number.`;
-  twiml.message(msg);
+  sendResponse(twiml, msg, true);
 }
 
 async function handleCategorySelect(from, choice, twiml) {
@@ -1125,7 +1135,7 @@ async function handleCategorySelect(from, choice, twiml) {
   const catKeys = Object.keys(vendor.categories);
   const selectedKey = catKeys[choice - 1];
 
-  if (!selectedKey) return twiml.message("Invalid category number.");
+  if (!selectedKey) return sendResponse(twiml, "Invalid category number.", true);
 
   await db.ref(`users/${from}`).update({
     step: 'item_select',
@@ -1138,7 +1148,7 @@ async function handleCategorySelect(from, choice, twiml) {
     msg += `${item.id}. ${item.name} - ${priceTxt}\n`;
   });
   msg += `\nReply item number.`;
-  twiml.message(msg);
+  sendResponse(twiml, msg, true);
 }
 
 async function handleItemSelect(from, id, twiml) {
@@ -1149,7 +1159,7 @@ async function handleItemSelect(from, id, twiml) {
   const cat = vendor.categories[user.current_category];
   const item = cat.find(i => i.id === id);
 
-  if (!item) return twiml.message("Invalid item number.");
+  if (!item) return sendResponse(twiml, "Invalid item number.", true);
 
   await db.ref(`users/${from}`).update({
     step: 'size_select',
@@ -1158,10 +1168,10 @@ async function handleItemSelect(from, id, twiml) {
 
   if (item.reg === item.ext) {
     await db.ref(`users/${from}/step`).set('quantity_select');
-    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many? (Enter number)`);
+    sendResponse(twiml, `*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many? (Enter number)`, true);
   } else {
     let msg = `*${item.name}*\n\nSelect Portion:\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`;
-    twiml.message(msg);
+    sendResponse(twiml, msg, true);
   }
 }
 
@@ -1170,7 +1180,7 @@ async function handleSizeSelect(from, msg, twiml) {
   const item = userSnap.val().selected_item;
 
   if (msg !== '1' && msg !== '2') {
-      return twiml.message("Invalid choice. Reply 1 for Regular or 2 for Extra.");
+      return sendResponse(twiml, "Invalid choice. Reply 1 for Regular or 2 for Extra.", true);
   }
 
   const size = msg === '1' ? 'reg' : 'ext';
@@ -1183,13 +1193,13 @@ async function handleSizeSelect(from, msg, twiml) {
     selected_size: label
   });
 
-  twiml.message(`*${item.name} (${label})*\n\nPrice: ${formatCurrency(price)}\n\nHow many? (Enter number)`);
+  sendResponse(twiml, `*${item.name} (${label})*\n\nPrice: ${formatCurrency(price)}\n\nHow many? (Enter number)`, true);
 }
 
 async function handleQuantitySelect(from, msg, twiml) {
   const qty = parseInt(msg);
   if (isNaN(qty) || qty <= 0) {
-    return twiml.message("⚠️ Please enter a valid number (e.g., 2).");
+    return sendResponse(twiml, "⚠️ Please enter a valid number (e.g., 2).", true);
   }
 
   const userSnap = await db.ref(`users/${from}`).once('value');
@@ -1219,7 +1229,7 @@ async function handleQuantitySelect(from, msg, twiml) {
           soupList += `${i + 1}. ${s}\n`;
       });
       soupList += `\nReply number.`;
-      twiml.message(soupList);
+      sendResponse(twiml, soupList, true);
       return;
   }
 
@@ -1240,7 +1250,7 @@ async function handleQuantitySelect(from, msg, twiml) {
       step: 'protein_loop',
       cart: cart
     });
-    twiml.message(`✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`);
+    sendResponse(twiml, `✅ Added ${qty}x ${item.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`, true);
   } else {
     await showCartSummary(from, cart, twiml);
   }
@@ -1254,7 +1264,7 @@ async function handleSoupSelect(from, msg, twiml) {
 
     const soupIndex = parseInt(msg) - 1;
     if (soupIndex < 0 || soupIndex >= FREE_SOUPS.length) {
-        return twiml.message("Invalid selection. Please reply 1-" + FREE_SOUPS.length);
+        return sendResponse(twiml, "Invalid selection. Please reply 1-" + FREE_SOUPS.length, true);
     }
 
     const selectedSoup = FREE_SOUPS[soupIndex];
@@ -1275,7 +1285,7 @@ async function handleSoupSelect(from, msg, twiml) {
         temp_swallow_item: null
     });
 
-    twiml.message(`✅ Added ${tempItem.qty}x ${finalItem.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`);
+    sendResponse(twiml, `✅ Added ${tempItem.qty}x ${finalItem.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`, true);
 }
 
 async function handleProteinLoop(from, msg, twiml) {
@@ -1288,7 +1298,7 @@ async function handleProteinLoop(from, msg, twiml) {
     let proteinCat = vendor.categories["PROTEINS"] || vendor.categories["Proteins"] || vendor.categories["Protein"];
 
     if (!proteinCat) {
-        twiml.message("This vendor doesn't have specific protein addons. Going to checkout.");
+        sendResponse(twiml, "This vendor doesn't have specific protein addons. Going to checkout.", true);
         return showCartSummary(from, userSnap.val().cart, twiml);
     }
 
@@ -1308,7 +1318,7 @@ async function handleProteinLoop(from, msg, twiml) {
             step: 'protein_select',
             current_category: proteinKey
         });
-        twiml.message(txt);
+        sendResponse(twiml, txt, true);
     } else {
         await showCartSummary(from, userSnap.val().cart, twiml);
     }
@@ -1317,7 +1327,7 @@ async function handleProteinLoop(from, msg, twiml) {
     const userSnap = await db.ref(`users/${from}`).once('value');
     await showCartSummary(from, userSnap.val().cart, twiml);
   } else {
-    twiml.message("Reply 1 or 2.");
+    sendResponse(twiml, "Reply 1 or 2.", true);
   }
 }
 
@@ -1330,7 +1340,7 @@ async function handleProteinSelect(from, id, twiml) {
   if(!cat) return showCartSummary(from, user.cart, twiml); // Fallback
 
   const item = cat.find(i => i.id === id);
-  if (!item) return twiml.message("Invalid item.");
+  if (!item) return sendResponse(twiml, "Invalid item.", true);
 
   await db.ref(`users/${from}`).update({
     step: 'protein_size',
@@ -1339,14 +1349,14 @@ async function handleProteinSelect(from, id, twiml) {
 
   if (item.reg === item.ext) {
     await db.ref(`users/${from}/step`).set('protein_qty');
-    twiml.message(`*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many pieces?`);
+    sendResponse(twiml, `*${item.name}*\n\nPrice: ${formatCurrency(item.reg)}\n\nHow many pieces?`, true);
   } else {
-    twiml.message(`*${item.name}*\n\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`);
+    sendResponse(twiml, `*${item.name}*\n\n1. Regular (${formatCurrency(item.reg)})\n2. Extra (${formatCurrency(item.ext)})\n\nReply 1 or 2.`, true);
   }
 }
 
 async function handleProteinSize(from, msg, twiml) {
-  if (msg !== '1' && msg !== '2') return twiml.message("Reply 1 or 2.");
+  if (msg !== '1' && msg !== '2') return sendResponse(twiml, "Reply 1 or 2.", true);
 
   const userSnap = await db.ref(`users/${from}`).once('value');
   const item = userSnap.val().selected_item;
@@ -1357,12 +1367,12 @@ async function handleProteinSize(from, msg, twiml) {
     selected_item_price: item[size],
     selected_size: msg === '1' ? 'Regular' : 'Extra'
   });
-  twiml.message(`*${item.name} (${msg === '1' ? 'Regular' : 'Extra'})*\n\nHow many pieces?`);
+  sendResponse(twiml, `*${item.name} (${msg === '1' ? 'Regular' : 'Extra'})*\n\nHow many pieces?`, true);
 }
 
 async function handleProteinQty(from, msg, twiml) {
     const qty = parseInt(msg);
-    if (isNaN(qty) || qty <= 0) return twiml.message("⚠️ Please enter a valid number.");
+    if (isNaN(qty) || qty <= 0) return sendResponse(twiml, "⚠️ Please enter a valid number.", true);
 
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
@@ -1380,7 +1390,7 @@ async function handleProteinQty(from, msg, twiml) {
   cart.push(newItem);
 
   await db.ref(`users/${from}`).update({ cart: cart, step: 'protein_loop' });
-  twiml.message(`✅ Added ${qty}x ${item.name}.\n\nAdd another protein?\n1. Yes\n2. No (Checkout)`);
+  sendResponse(twiml, `✅ Added ${qty}x ${item.name}.\n\nAdd another protein?\n1. Yes\n2. No (Checkout)`, true);
 }
 
 async function showCartSummary(from, cart, twiml) {
@@ -1398,7 +1408,7 @@ async function showCartSummary(from, cart, twiml) {
     step: 'add_more_or_checkout',
     cart_subtotal: sub
   });
-  twiml.message(txt);
+  sendResponse(twiml, txt, true);
 }
 
 // --- ERRAND & PICKUP HANDLERS ---
@@ -1412,7 +1422,7 @@ async function handleErrandType(from, type, twiml) {
   else if (type === 2) { typeStr = "PICK_UP"; isPickup = true; }
   else if (type === 3) { typeStr = "PHARMACY"; needsShopping = true; }
   else if (type === 4) { typeStr = "TASK"; isPickup = true; }
-  else return twiml.message("Invalid selection.");
+  else return sendResponse(twiml, "Invalid selection.", true);
 
   await db.ref(`users/${from}`).update({
     errand_type: typeStr,
@@ -1422,13 +1432,13 @@ async function handleErrandType(from, type, twiml) {
 
   if (isPickup) {
     await db.ref(`users/${from}/step`).set('pickup_description');
-    twiml.message("📝 *Describe the task or pickup details:*\n(e.g., Get a bag of drink at Tarmac)");
+    sendResponse(twiml, "📝 *Describe task or pickup details:*\n(e.g., Get a bag of drink at Tarmac)", true);
   } else if (needsShopping) {
     await db.ref(`users/${from}/step`).set('errand_details');
-    twiml.message(`📝 *List the items you want to buy.*\n\nFormat: Item Price, Item Price\nExample: Beans 2000, Oil 500`);
+    sendResponse(twiml, `📝 *List the items you want to buy.*\n\nFormat: Item Price, Item Price\nExample: Beans 2000, Oil 500`, true);
   } else {
     await db.ref(`users/${from}/step`).set('pickup_description');
-    twiml.message("📝 *Describe the task:*");
+    sendResponse(twiml, "📝 *Describe the task:*", true);
   }
 }
 
@@ -1449,7 +1459,7 @@ async function handleErrandDetails(from, text, twiml) {
     }
   });
 
-  if (items.length === 0) return twiml.message("⚠️ Could not read prices. Example: 'Beans 2000'");
+  if (items.length === 0) return sendResponse(twiml, "⚠️ Could not read prices. Example: 'Beans 2000'", true);
 
   await db.ref(`users/${from}`).update({
     step: 'customer_name',
@@ -1460,52 +1470,52 @@ async function handleErrandDetails(from, text, twiml) {
   let msg = `✅ Items saved:\n`;
   items.forEach(i => msg += `- ${i.name}: ${formatCurrency(i.price)}\n`);
   msg += `\nTotal Items Cost: ${formatCurrency(budget)}\n\n📝 Next, please provide your Name.`;
-  twiml.message(msg);
+  sendResponse(twiml, msg, true);
 }
 
 async function handlePickupDescription(from, text, twiml) {
-    if (!text || text.trim().length === 0) return twiml.message("⚠️ Description cannot be empty.");
+    if (!text || text.trim().length === 0) return sendResponse(twiml, "⚠️ Description cannot be empty.", true);
     await db.ref(`users/${from}`).update({
         step: 'vendor_name',
         errand_description: text
     });
-    twiml.message("👤 *Who are we picking from?*\n\nPlease provide the Name of the person or shop.");
+    sendResponse(twiml, "👤 *Who are we picking from?*\n\nPlease provide the Name of the person or shop.", true);
 }
 
 async function handleVendorName(from, text, twiml) {
-    if (!text || text.trim().length === 0) return twiml.message("⚠️ Name cannot be empty.");
+    if (!text || text.trim().length === 0) return sendResponse(twiml, "⚠️ Name cannot be empty.", true);
     await db.ref(`users/${from}`).update({
         step: 'vendor_phone',
         vendor_name: text
     });
-    twiml.message("📞 *What is their Phone Number?*\n(We need to contact them).");
+    sendResponse(twiml, "📞 *What is their Phone Number?*\n(We need to contact them).", true);
 }
 
 async function handleVendorPhone(from, text, twiml) {
     const cleanPhone = text.replace(/\D/g,'');
-    if (cleanPhone.length < 10) return twiml.message("⚠️ Invalid phone number.");
+    if (cleanPhone.length < 10) return sendResponse(twiml, "⚠️ Invalid phone number.", true);
 
     await db.ref(`users/${from}`).update({
         step: 'customer_name',
         vendor_phone: cleanPhone
     });
-    twiml.message("👤 *What is YOUR Name?* (Customer Name)");
+    sendResponse(twiml, "👤 *What is YOUR Name?* (Customer Name)", true);
 }
 
 // --- GENERAL CHECKOUT FLOW HANDLERS ---
 
 async function handleCustomerName(from, text, twiml) {
-    if (!text || text.trim().length === 0) return twiml.message("⚠️ Name cannot be empty.");
+    if (!text || text.trim().length === 0) return sendResponse(twiml, "⚠️ Name cannot be empty.", true);
     await db.ref(`users/${from}`).update({
         step: 'customer_phone',
         customer_name: text
     });
-    twiml.message("📞 Please share YOUR Phone Number (e.g. 08012345678).");
+    sendResponse(twiml, "📞 Please share YOUR Phone Number (e.g. 08012345678).", true);
 }
 
 async function handleCustomerPhone(from, text, twiml) {
     const cleanPhone = text.replace(/\D/g,'');
-    if (cleanPhone.length < 10) return twiml.message("⚠️ Invalid phone number. Please enter a valid number.");
+    if (cleanPhone.length < 10) return sendResponse(twiml, "⚠️ Invalid phone number. Please enter a valid number.", true);
 
     await db.ref(`users/${from}`).update({
         step: 'delivery_location', // Skip pickup location for food
@@ -1522,34 +1532,34 @@ async function handleCustomerPhone(from, text, twiml) {
         await db.ref(`users/${from}`).update({
             pickup_location: pickup
         });
-        twiml.message(`📍 Where should the rider drop the items? (Your Hostel/Room/Address)\n\n(Note: Pickup will be at ${vendor.name})`);
+        sendResponse(twiml, `📍 Where should the rider drop the items? (Your Hostel/Room/Address)\n\n(Note: Pickup will be at ${vendor.name})`, true);
     } else {
         // For Errands, we still need pickup location
         await db.ref(`users/${from}`).update({
             step: 'pickup_location'
         });
-        twiml.message("📍 *Where is the Pickup Location?*\n\n(e.g. Tarmac, School Road, Westend, Safari)");
+        sendResponse(twiml, "📍 *Where is the Pickup Location?*\n\n(e.g. Tarmac, School Road, Westend, Safari)", true);
     }
 }
 
 async function handlePickupLocation(from, text, twiml) {
     // Only used for Errands now
-    if (!text || text.trim().length === 0) return twiml.message("⚠️ Location cannot be empty.");
+    if (!text || text.trim().length === 0) return sendResponse(twiml, "⚠️ Location cannot be empty.", true);
     await db.ref(`users/${from}`).update({
         step: 'delivery_location',
         pickup_location: text.trim()
     });
-    twiml.message("📍 Where should the rider drop the items? (Your Hostel/Room/Address)");
+    sendResponse(twiml, "📍 Where should the rider drop the items? (Your Hostel/Room/Address)", true);
 }
 
 // ADDED: Handle manual pickup location entry (Currently unused due to auto-food logic, but kept for safety)
 async function handlePickupLocationManual(from, text, twiml) {
-    if (!text || text.trim().length === 0) return twiml.message("⚠️ Address cannot be empty.");
+    if (!text || text.trim().length === 0) return sendResponse(twiml, "⚠️ Address cannot be empty.", true);
     await db.ref(`users/${from}`).update({
         step: 'delivery_location',
         pickup_location: text.trim()
     });
-    twiml.message("📍 Where should the rider drop the items? (Your Hostel/Room/Address)");
+    sendResponse(twiml, "📍 Where should the rider drop the items? (Your Hostel/Room/Address)", true);
 }
 
 async function handleDeliveryLocation(from, text, twiml) {
@@ -1604,11 +1614,11 @@ async function generateOrderSummary(from, twiml) {
     await db.ref(`users/${from}`).update({ final_total: total });
 
     summary += `\n\nReply "CONFIRM" to proceed to payment.`;
-    twiml.message(summary);
+    sendResponse(twiml, summary, true);
 }
 
 async function handleFinalConfirm(from, msg, twiml) {
-  if (msg !== 'confirm') return twiml.message("Please type CONFIRM to proceed.");
+  if (msg !== 'confirm') return sendResponse(twiml, "Please type CONFIRM to proceed.", true);
 
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
@@ -1617,6 +1627,7 @@ async function handleFinalConfirm(from, msg, twiml) {
     step: 'awaiting_payment'
   });
 
+  // NO INSTRUCTIONS ON PAYMENT SCREEN
   twiml.message(`💳 *Payment Details*\n\nPlease pay ${formatCurrency(user.final_total)} to:\n\n🏦 *Bank:* Monie Point\n👤 *Name:* ChowZone Dev\n🔢 *Acct:* 70437763589\n\n📸 *Send a screenshot of the receipt here to complete your order.*`);
 }
 
@@ -1803,20 +1814,20 @@ async function updateOrderStatus(orderId, status, twiml, from) {
 async function handleRateRider(from, msg, twiml) {
     const rating = parseInt(msg);
     if (isNaN(rating) || rating < 1 || rating > 5) {
-        return twiml.message("Please enter a number between 1 and 5.");
+        return sendResponse(twiml, "Please enter a number between 1 and 5.", true);
     }
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
     const orderId = user.last_order_id;
     await db.ref(`orders/${orderId}/rating/rider`).set(rating);
     await db.ref(`users/${from}`).update({ step: 'rate_service' });
-    twiml.message(`Thanks! How would you rate ChowZone service? (1-5 stars)`);
+    sendResponse(twiml, `Thanks! How would you rate ChowZone service? (1-5 stars)`, true);
 }
 
 async function handleRateService(from, msg, twiml) {
     const rating = parseInt(msg);
     if (isNaN(rating) || rating < 1 || rating > 5) {
-        return twiml.message("Please enter a number between 1 and 5.");
+        return sendResponse(twiml, "Please enter a number between 1 and 5.", true);
     }
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
