@@ -40,7 +40,6 @@ const SUPPORT_PHONE = "+2349138765380";
 const client = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 // --- FORCE SANDBOX SENDER ID ---
-// In the Sandbox, the "From" number MUST be this specific string to work correctly.
 const SANDBOX_NUMBER = "whatsapp:+14155238886";
 
 // --- HELPER: FORMAT NUMBERS FOR WHATSAPP ---
@@ -732,6 +731,63 @@ function formatCurrency(amount) {
   return `₦${amount.toLocaleString()}`;
 }
 
+// Helper to handle Back Navigation logic
+async function goBackStep(from, user, twiml) {
+  const map = {
+    'vendor_select': 'main_menu',
+    'category_select': 'vendor_select',
+    'item_select': 'category_select',
+    'size_select': 'item_select',
+    'quantity_select': 'item_select',
+    'soup_select': 'quantity_select',
+    'protein_loop': 'quantity_select',
+    'protein_select': 'protein_loop',
+    'protein_size': 'protein_select',
+    'protein_qty': 'protein_select',
+    'add_more_or_checkout': 'protein_loop',
+    'errand_type': 'main_menu',
+    'errand_details': 'errand_type',
+    'pickup_description': 'errand_type',
+    'vendor_name': 'pickup_description',
+    'vendor_phone': 'vendor_name',
+    'customer_name': 'vendor_phone',
+    'customer_phone': 'customer_name',
+    'pickup_location': 'customer_phone',
+    'delivery_location': 'pickup_location',
+    'confirm_order': 'delivery_location'
+  };
+
+  const prevStep = map[user.step];
+  
+  if (!prevStep) {
+    // If no mapping found, just restart
+    await resetUser(from, twiml);
+    return;
+  }
+
+  await db.ref(`users/${from}/step`).set(prevStep);
+
+  // Re-trigger the appropriate handler to show the menu
+  if (prevStep === 'main_menu') {
+    await handleMainMenu(from, null, twiml);
+  } else if (prevStep === 'vendor_select') {
+    let menuText = `🏪 *Select a Vendor*\n\n`;
+    VENDORS.forEach((v, index) => menuText += `${index + 1}. ${v.name}\n`);
+    menuText += `\nReply with the vendor number.`;
+    twiml.message(menuText);
+  } else if (prevStep === 'category_select') {
+    await showCategories(from, twiml);
+  } else if (prevStep === 'quantity_select') {
+    // If going back to item select, we need to show items
+    await handleCategorySelect(from, (Object.keys(VENDORS.find(v=>v.id===user.selected_vendor_id).categories).indexOf(user.current_category) + 1), twiml);
+  } else if (prevStep === 'errand_type') {
+     twiml.message(`🏃 *Select Errand Type*\n\n1. 🛒 Market Shopping\n2. 📦 Pick Up Item\n3. 💊 Pharmacy / Supermarket\n4. 📝 Campus Task\n\nReply with number.`);
+  } else {
+    // Generic fallback for form steps
+    twiml.message("⬅️ Going back to the previous step...");
+  }
+}
+
 // --- 6. MAIN WEBHOOK ROUTE ---
 app.post('/whatsapp', async (req, res) => {
   const twiml = new twilio.twiml.MessagingResponse();
@@ -750,7 +806,30 @@ app.post('/whatsapp', async (req, res) => {
         return res.type('text/xml').send(twiml.toString());
     }
 
-    // --- B. MEDIA HANDLING (Payment Screenshots) ---
+    // --- B. GLOBAL CANCEL COMMAND (PRIORITY) ---
+    // Works at ANY time, including after payment
+    if (msg === 'cancel' || msg === 'cancel order') {
+      const userSnap = await db.ref(`users/${from}`).once('value');
+      const user = userSnap.val();
+      
+      // If there is an active order in DB, mark it cancelled
+      if (user && user.last_order_id) {
+        await db.ref(`orders/${user.last_order_id}/status`).set('cancelled_by_user');
+      }
+
+      // Reset user session
+      await db.ref(`users/${from}`).set({
+        step: 'main_menu',
+        cart: [],
+        order_type: null,
+        last_order_id: null // Clear active order
+      });
+      
+      twiml.message("🚫 *Order Cancelled.*\n\nYour session has been reset. Reply 'Menu' to start a new order.");
+      return res.type('text/xml').send(twiml.toString());
+    }
+
+    // --- C. MEDIA HANDLING (Payment Screenshots) ---
     if (numMedia > 0) {
       const userSnap = await db.ref(`users/${from}`).once('value');
       const user = userSnap.val();
@@ -764,7 +843,7 @@ app.post('/whatsapp', async (req, res) => {
       }
     }
 
-    // --- C. RIDER REGISTRATION ---
+    // --- D. RIDER REGISTRATION ---
     if (msg.startsWith('register rider ')) {
       const parts = originalMsg.split(' ');
       const code = parts[2];
@@ -787,18 +866,23 @@ app.post('/whatsapp', async (req, res) => {
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val() || { step: 'new' };
 
-    // --- GLOBAL CANCEL COMMAND ---
-    if ((msg === 'cancel' || msg === '0') && user.step !== 'main_menu' && user.step !== 'new') {
-        await resetUser(from, twiml);
-        return res.type('text/xml').send(twiml.toString());
+    // --- E. BACKWARD NAVIGATION (Reply 0) ---
+    // Only works if there is NO active paid order (to avoid confusion)
+    if (msg === '0' && !user.last_order_id) {
+        if (user.step !== 'main_menu' && user.step !== 'new') {
+            await goBackStep(from, user, twiml);
+            return res.type('text/xml').send(twiml.toString());
+        }
     }
 
-    // --- CHECK ACTIVE ORDER STATUS ---
+    // --- F. CHECK ACTIVE ORDER STATUS (Robustness) ---
+    // If an active order exists, re-send status to ensure user doesn't break flow
     const orderId = user.last_order_id;
     if (orderId) {
         const orderSnap = await db.ref(`orders/${orderId}`).once('value');
         const order = orderSnap.val();
 
+        // If order is active (not cancelled/delivered), re-send status
         if (order && (order.status === 'pending_payment' || order.status === 'seeking_rider' || order.status === 'rider_accepted')) {
             let msg = "";
             if (order.status === 'pending_payment') {
@@ -813,8 +897,7 @@ app.post('/whatsapp', async (req, res) => {
         }
     }
 
-    // --- D. ADMIN COMMANDS ---
-    // Normalize Admin Phone Check to handle potential formatting differences
+    // --- G. ADMIN COMMANDS ---
     const formattedFrom = formatWhatsappNumber(from);
     const formattedAdminPhone = formatWhatsappNumber(ADMIN_PHONE);
 
@@ -833,7 +916,7 @@ app.post('/whatsapp', async (req, res) => {
       }
     }
 
-    // --- E. RIDER COMMANDS ---
+    // --- H. RIDER COMMANDS ---
     const riderSnap = await db.ref(`riders/${from}`).once('value');
     const rider = riderSnap.val();
 
@@ -859,7 +942,7 @@ app.post('/whatsapp', async (req, res) => {
       }
     }
 
-    // --- F. CUSTOMER FLOW STATE MACHINE ---
+    // --- I. CUSTOMER FLOW STATE MACHINE ---
     if (msg === 'hi' || msg === 'menu' || msg === 'start') {
       await resetUser(from, twiml);
       return res.type('text/xml').send(twiml.toString());
@@ -979,7 +1062,8 @@ async function resetUser(from, twiml) {
     step: 'main_menu',
     cart: [],
     order_type: null,
-    errand_data: {}
+    errand_data: {},
+    last_order_id: null // Ensure order is cleared on reset
   });
   const welcomeMsg = `🍽️ *Welcome to ChowZone!*\n\nHow can we help you today?\n\n1. Order Food\n2. Errands (Market/Pharmacy/Pickup)\n\nReply with number 1 or 2.\n(Text 'Cancel' anytime to restart)`;
   twiml.message(welcomeMsg);
@@ -1424,7 +1508,7 @@ async function handleCustomerPhone(from, text, twiml) {
     if (cleanPhone.length < 10) return twiml.message("⚠️ Invalid phone number. Please enter a valid number.");
 
     await db.ref(`users/${from}`).update({
-        step: 'pickup_location',
+        step: 'delivery_location', // Skip pickup location for food
         customer_phone: cleanPhone
     });
 
@@ -1433,35 +1517,32 @@ async function handleCustomerPhone(from, text, twiml) {
     const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
 
     if (user.order_type === 'food') {
-        const vendorName = vendor ? vendor.name : "Vendor";
-        twiml.message(`📍 *Where is the Pickup Location?*\n\n1. ${vendorName} (Default)\n2. Type a different address\n\nReply 1 or 2.`);
+        // AUTOMATIC PICKUP LOCATION FOR FOOD
+        const pickup = vendor ? vendor.address : "Vendor Kitchen";
+        await db.ref(`users/${from}`).update({
+            pickup_location: pickup
+        });
+        twiml.message(`📍 Where should the rider drop the items? (Your Hostel/Room/Address)\n\n(Note: Pickup will be at ${vendor.name})`);
     } else {
+        // For Errands, we still need pickup location
+        await db.ref(`users/${from}`).update({
+            step: 'pickup_location'
+        });
         twiml.message("📍 *Where is the Pickup Location?*\n\n(e.g. Tarmac, School Road, Westend, Safari)");
     }
 }
 
 async function handlePickupLocation(from, text, twiml) {
-    const userSnap = await db.ref(`users/${from}`).once('value');
-    const user = userSnap.val();
-    const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
-
-    let location = text;
-
-    if (user.order_type === 'food' && text.trim() === '1') {
-        location = vendor ? vendor.address : "Vendor Location";
-    } else if (user.order_type === 'food' && text.trim() === '2') {
-        await db.ref(`users/${from}/step`).set('pickup_location_manual');
-        return twiml.message("📍 Please type the specific pickup address:");
-    }
-
+    // Only used for Errands now
+    if (!text || text.trim().length === 0) return twiml.message("⚠️ Location cannot be empty.");
     await db.ref(`users/${from}`).update({
         step: 'delivery_location',
-        pickup_location: location
+        pickup_location: text.trim()
     });
     twiml.message("📍 Where should the rider drop the items? (Your Hostel/Room/Address)");
 }
 
-// ADDED: Handle manual pickup location entry
+// ADDED: Handle manual pickup location entry (Currently unused due to auto-food logic, but kept for safety)
 async function handlePickupLocationManual(from, text, twiml) {
     if (!text || text.trim().length === 0) return twiml.message("⚠️ Address cannot be empty.");
     await db.ref(`users/${from}`).update({
@@ -1573,7 +1654,7 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
   await db.ref(`orders/${orderId}`).set(orderData);
 
   await db.ref(`users/${from}`).update({
-      step: 'new',
+      step: 'new', // Reset step so user can't add more items, but keep order_id
       last_order_id: orderId
   });
 
