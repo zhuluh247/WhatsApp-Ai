@@ -36,14 +36,16 @@ const DELIVERY_FEE = parseInt(process.env.DELIVERY_FEE) || 500;
 const SHOPPING_FEE = parseInt(process.env.SHOPPING_FEE) || 500;
 const SUPPORT_PHONE = "+2349138765380";
 
-// Initialize Twilio Client Globally
+// --- TWILIO CLIENT ---
 const client = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// --- HELPER: FORMAT NUMBERS FOR WHATSAPP SANDBOX ---
-// Ensures the number always starts with 'whatsapp:' to avoid Sandbox errors
+// --- FORCE SANDBOX SENDER ID ---
+// In the Sandbox, the "From" number MUST be this specific string to work correctly.
+const SANDBOX_NUMBER = "whatsapp:+14155238886";
+
+// --- HELPER: FORMAT NUMBERS FOR WHATSAPP ---
 function formatWhatsappNumber(number) {
   if (!number) return number;
-  // Remove existing 'whatsapp:' prefix if present, trim whitespace
   let clean = number.replace(/whatsapp:/g, '').trim();
   return `whatsapp:${clean}`;
 }
@@ -812,7 +814,11 @@ app.post('/whatsapp', async (req, res) => {
     }
 
     // --- D. ADMIN COMMANDS ---
-    if (from === ADMIN_PHONE || formatWhatsappNumber(from) === formatWhatsappNumber(ADMIN_PHONE)) {
+    // Normalize Admin Phone Check to handle potential formatting differences
+    const formattedFrom = formatWhatsappNumber(from);
+    const formattedAdminPhone = formatWhatsappNumber(ADMIN_PHONE);
+
+    if (formattedFrom === formattedAdminPhone) {
       if (msg.startsWith('approve ')) {
         const orderId = msg.split(' ')[1];
         await approveOrder(orderId);
@@ -889,7 +895,7 @@ app.post('/whatsapp', async (req, res) => {
       case 'quantity_select':
         await handleQuantitySelect(from, msg, twiml);
         break;
-      case 'soup_select': // NEW STEP FOR SOUP
+      case 'soup_select':
         await handleSoupSelect(from, msg, twiml);
         break;
       case 'protein_loop':
@@ -938,7 +944,7 @@ app.post('/whatsapp', async (req, res) => {
       case 'pickup_location':
         await handlePickupLocation(from, originalMsg, twiml);
         break;
-      case 'pickup_location_manual': // ADDED MISSING CASE
+      case 'pickup_location_manual':
         await handlePickupLocationManual(from, originalMsg, twiml);
         break;
       case 'delivery_location':
@@ -1110,9 +1116,7 @@ async function handleQuantitySelect(from, msg, twiml) {
   const currentCategory = user.current_category;
 
   // Logic for Swallows + Free Soup
-  // Use toLowerCase() to catch both "SWALLOWS" and "Swallows"
   if (currentCategory.toLowerCase().includes('swallow')) {
-      // Save the item details temporarily
       const tempItem = {
           name: item.name,
           price: price,
@@ -1576,9 +1580,9 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
   twiml.message(`✅ *Order Received!*\n\nYour Order #${orderId} is worth ${formatCurrency(total)}.\n\nWe are verifying your payment now. You will be notified shortly.`);
 
   try {
-    // ENSURE PROPER FORMATTING
-    const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
+    // DEBUG: Print numbers to console
     const adminPhone = formatWhatsappNumber(ADMIN_PHONE);
+    console.log(`[DEBUG] Sending to Admin: ${adminPhone} | From: ${SANDBOX_NUMBER}`);
 
     let itemsList = "";
     if (user.order_type === 'food') {
@@ -1609,8 +1613,8 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
                     `\n[Check WhatsApp for Screenshot]`;
 
     const messageOptions = {
-      from: fromNumber, // FORMATTED
-      to: adminPhone,   // FORMATTED
+      from: SANDBOX_NUMBER, // HARDCODED SANDBOX SENDER
+      to: adminPhone,      // FORMATTED ADMIN NUMBER
       body: adminMsg
     };
 
@@ -1619,6 +1623,8 @@ async function createOrderInDB(from, user, twiml, mediaUrl) {
     }
 
     await client.messages.create(messageOptions);
+    console.log(`[DEBUG] Admin message sent successfully.`);
+
   } catch (err) {
     console.error("Failed to send Admin notification:", err);
   }
@@ -1631,11 +1637,8 @@ async function approveOrder(orderId) {
 
   await db.ref(`orders/${orderId}/status`).set('seeking_rider');
 
-  // ENSURE PROPER FORMATTING
-  const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
-
   await client.messages.create({
-    from: fromNumber, // FORMATTED
+    from: SANDBOX_NUMBER,
     to: order.customer,
     body: `✅ *Payment Verified*\n\nYour Order #${orderId} has been placed! We are assigning a rider now.`
   });
@@ -1650,11 +1653,8 @@ async function rejectOrder(orderId) {
 
   await db.ref(`orders/${orderId}/status`).set('rejected');
 
-  // ENSURE PROPER FORMATTING
-  const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
-
   await client.messages.create({
-    from: fromNumber, // FORMATTED
+    from: SANDBOX_NUMBER,
     to: order.customer,
     body: `❌ *Payment Not Found*\n\nWe could not verify your payment for Order #${orderId}. Please contact Admin or try again.`
   });
@@ -1677,8 +1677,6 @@ async function acceptOrder(riderPhone, orderId, twiml) {
 
   twiml.message(`✅ You have accepted Order #${orderId}. Wait for Admin to contact you regarding payment details.`);
 
-  // ENSURE PROPER FORMATTING
-  const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
   const adminPhone = formatWhatsappNumber(ADMIN_PHONE);
 
   const adminMsg = `🛵 *RIDER ACCEPTED JOB*\n\n` +
@@ -1688,13 +1686,13 @@ async function acceptOrder(riderPhone, orderId, twiml) {
                   `Please contact rider to arrange details and send the order payment to his account manually.`;
 
   await client.messages.create({
-    from: fromNumber, // FORMATTED
-    to: adminPhone,   // FORMATTED
+    from: SANDBOX_NUMBER,
+    to: adminPhone,
     body: adminMsg
   });
 
   await client.messages.create({
-    from: fromNumber, // FORMATTED
+    from: SANDBOX_NUMBER,
     to: order.customer,
     body: `🛵 *Rider Assigned*\n\nOrder #${orderId}\nRider Name: ${rider.name}\nRider Phone: ${riderPhone}\n\nExpect delivery shortly.`
   });
@@ -1708,13 +1706,10 @@ async function updateOrderStatus(orderId, status, twiml, from) {
   await db.ref(`orders/${orderId}/status`).set(status);
 
   if (status === 'delivered') {
-    // ENSURE PROPER FORMATTING
-    const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
-
     await db.ref(`users/${order.customer}`).update({ step: 'rate_rider' });
 
     await client.messages.create({
-      from: fromNumber, // FORMATTED
+      from: SANDBOX_NUMBER,
       to: order.customer,
       body: `✅ *Order Delivered!*\n\nOrder #${orderId} is complete.\n\nPlease rate your Rider (1-5 stars):`
     });
@@ -1754,9 +1749,6 @@ async function broadcastToRiders(orderId, order) {
   const ridersSnap = await db.ref('riders').orderByChild('status').equalTo('on_duty').once('value');
   const riders = ridersSnap.val();
 
-  // ENSURE PROPER FORMATTING
-  const fromNumber = formatWhatsappNumber(process.env.TWILIO_PHONE_NUMBER);
-
   let itemsSummary = "";
   if (order.type === 'food') {
       order.details.forEach(d => itemsSummary += `${d.name} x${d.qty}, `);
@@ -1785,8 +1777,8 @@ async function broadcastToRiders(orderId, order) {
       const rider = riders[key];
       if (rider.phone) {
         client.messages.create({
-          from: fromNumber, // FORMATTED
-          to: rider.phone,
+          from: SANDBOX_NUMBER,
+          to: formatWhatsappNumber(rider.phone),
           body: msg
         }).then(message => console.log(message.sid))
         .catch(err => console.error(err));
