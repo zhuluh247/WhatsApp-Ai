@@ -36,41 +36,678 @@ const DELIVERY_FEE = parseInt(process.env.DELIVERY_FEE) || 500;
 const SHOPPING_FEE = parseInt(process.env.SHOPPING_FEE) || 500;
 const SUPPORT_PHONE = "+2349138765380"; 
 
-// --- 4. MENU DATA (Bissy Joy Eatery) ---
-const VENDOR_NAME = "Bissy Joy Eatery";
-const VENDOR_ADDRESS = "Bissy Joy Eatery Kitchen";
-const MENU_CATEGORIES = {
-  "RICE_MEALS": [
-    { id: 1, name: "White Rice", reg: 2500, ext: 3000 },
-    { id: 2, name: "Jollof & Fried Rice", reg: 2500, ext: 3000 },
-    { id: 3, name: "Chinese Rice", reg: 4000, ext: 5000 },
-    { id: 4, name: "Village Rice", reg: 4000, ext: 4500 },
-    { id: 5, name: "Jollof Macaroni", reg: 3000, ext: 3500 },
-    { id: 6, name: "Jollof Spaghetti", reg: 3000, ext: 3500 },
-    { id: 7, name: "Ofada Rice", reg: 4000, ext: 5000 },
-    { id: 8, name: "Beans & Rice", reg: 3000, ext: 3500 }
-  ],
-  "SWALLOWS": [
-    { id: 9, name: "Yam Porridge", reg: 3000, ext: 3500 },
-    { id: 10, name: "Yam & Egg", reg: 3000, ext: 3500 },
-    { id: 11, name: "Beans & Bread", reg: 2500, ext: 3000 },
-    { id: 12, name: "Eba", reg: 2500, ext: 3000 },
-    { id: 13, name: "Amala", reg: 2500, ext: 3000 },
-    { id: 14, name: "Fufu", reg: 3000, ext: 3500 },
-    { id: 15, name: "Pounded Yam", reg: 2500, ext: 3000 }
-  ],
-  "PROTEINS": [
-    { id: 16, name: "Pepper Soup", reg: 2800, ext: 3000 },
-    { id: 17, name: "Chicken", reg: 2000, ext: 2500 },
-    { id: 18, name: "Turkey", reg: 3500, ext: 4000 },
-    { id: 19, name: "Fish", reg: 2000, ext: 2500 },
-    { id: 20, name: "Assorted", reg: 500, ext: 1000 },
-    { id: 21, name: "Goat Meat", reg: 500, ext: 1000 },
-    { id: 22, name: "Ponmo", reg: 200, ext: 500 },
-    { id: 23, name: "Beef", reg: 500, ext: 500 }, 
-    { id: 24, name: "Egg", reg: 300, ext: 300 }
-  ]
-};
+// --- 4. MENU DATA (21 VENDORS) ---
+const FREE_SOUPS = ["Egusi", "Okro", "Ewedu", "Vegetable", "Gbegiri", "Gbegiri & Ewedu"];
+
+const VENDORS = [
+  {
+    id: "bissy_joy",
+    name: "Bissy Joy Eatery",
+    address: "Bissy Joy Eatery Kitchen",
+    categories: {
+      "RICE_MEALS": [
+        { id: 1, name: "White Rice", reg: 2500, ext: 3000 },
+        { id: 2, name: "Jollof & Fried Rice", reg: 2500, ext: 3000 },
+        { id: 3, name: "Chinese Rice", reg: 4000, ext: 5000 },
+        { id: 4, name: "Village Rice", reg: 4000, ext: 4500 },
+        { id: 5, name: "Jollof Macaroni", reg: 3000, ext: 3500 },
+        { id: 6, name: "Jollof Spaghetti", reg: 3000, ext: 3500 },
+        { id: 7, name: "Ofada Rice", reg: 4000, ext: 5000 },
+        { id: 8, name: "Beans & Rice", reg: 3000, ext: 3500 }
+      ],
+      "SWALLOWS": [
+        { id: 9, name: "Yam Porridge", reg: 3000, ext: 3500 },
+        { id: 10, name: "Yam & Egg", reg: 3000, ext: 3500 },
+        { id: 11, name: "Beans & Bread", reg: 2500, ext: 3000 },
+        { id: 12, name: "Eba", reg: 2500, ext: 3000 },
+        { id: 13, name: "Amala", reg: 2500, ext: 3000 },
+        { id: 14, name: "Fufu", reg: 3000, ext: 3500 },
+        { id: 15, name: "Pounded Yam", reg: 2500, ext: 3000 }
+      ],
+      "PROTEINS": [
+        { id: 16, name: "Pepper Soup", reg: 2800, ext: 3000 },
+        { id: 17, name: "Chicken", reg: 2000, ext: 2500 },
+        { id: 18, name: "Turkey", reg: 3500, ext: 4000 },
+        { id: 19, name: "Fish", reg: 2000, ext: 2500 },
+        { id: 20, name: "Assorted", reg: 500, ext: 1000 },
+        { id: 21, name: "Goat Meat", reg: 500, ext: 1000 },
+        { id: 22, name: "Ponmo", reg: 200, ext: 500 },
+        { id: 23, name: "Beef", reg: 500, ext: 500 }, 
+        { id: 24, name: "Egg", reg: 300, ext: 300 }
+      ]
+    }
+  },
+  {
+    id: "tee_jay",
+    name: "Tee Jay Frozen Food",
+    address: "Tee Jay Location", // Update if needed
+    categories: {
+      "Fish Per Kilo": [
+        { id: 1, name: "Shawa", reg: 3400, ext: 3400 },
+        { id: 2, name: "Titus", reg: 7000, ext: 7000 },
+        { id: 3, name: "Hake", reg: 5200, ext: 5200 },
+        { id: 4, name: "Kote", reg: 4000, ext: 4000 },
+        { id: 5, name: "Croacker", reg: 6000, ext: 6000 },
+        { id: 6, name: "Snail", reg: 7000, ext: 7000 }
+      ],
+      "Turkey Per Kilo": [
+        { id: 7, name: "Turkey wings", reg: 9999, ext: 9999 },
+        { id: 8, name: "Turkey finger", reg: 7000, ext: 7000 },
+        { id: 9, name: "Chicken Filet", reg: 6200, ext: 6200 }
+      ],
+      "Chicken Per Kilo": [
+        { id: 10, name: "Chicken", reg: 4600, ext: 4600 },
+        { id: 11, name: "Gizzard", reg: 5200, ext: 5200 },
+        { id: 12, name: "Leg and head", reg: 2200, ext: 2200 },
+        { id: 13, name: "Neck of Chicken", reg: 2500, ext: 2500 },
+        { id: 14, name: "Chicken wings", reg: 6000, ext: 6000 },
+        { id: 15, name: "Chicken Breast", reg: 5000, ext: 5000 }
+      ],
+      "Other For Pack": [
+        { id: 16, name: "Susages", reg: 2600, ext: 2600 },
+        { id: 17, name: "Sharwama Bread", reg: 1300, ext: 1300 },
+        { id: 18, name: "Chips/Fries", reg: 4500, ext: 4500 },
+        { id: 19, name: "Shrimps", reg: 13000, ext: 13000 },
+        { id: 20, name: "Crabs", reg: 6000, ext: 6000 },
+        { id: 21, name: "Cheese", reg: 4000, ext: 4000 },
+        { id: 22, name: "Chicken Lap", reg: 6000, ext: 6000 }
+      ]
+    }
+  },
+  {
+    id: "biggy_shack",
+    name: "BIGGY’S SHACK SHARWAMA",
+    address: "Biggy Location", 
+    categories: {
+      "Sharwama & Combos": [
+        { id: 1, name: "Double sausage chicken", reg: 3000, ext: 3000 },
+        { id: 2, name: "Double sausage extra chicken", reg: 3500, ext: 3500 },
+        { id: 3, name: "Double sausage chicken/suya", reg: 4000, ext: 4000 },
+        { id: 4, name: "Double Sausage Suya filled", reg: 4000, ext: 4000 },
+        { id: 5, name: "Combo Extra chicken/Suya", reg: 4500, ext: 4500 },
+        { id: 6, name: "Breadwarma", reg: 6000, ext: 6000 },
+        { id: 7, name: "BIG MEN SIZE shawarma", reg: 8000, ext: 8000 },
+        { id: 8, name: "Chicken and chips", reg: 5000, ext: 5000 },
+        { id: 9, name: "Friends Combo", reg: 7500, ext: 7500 }
+      ]
+    }
+  },
+  {
+    id: "zrof_pharmacy",
+    name: "Zrof Pharmacy",
+    address: "Zrof Location",
+    categories: {
+      "Contraceptives & Supplements": [
+        { id: 1, name: "POSTINOR 2", reg: 2500, ext: 2500 },
+        { id: 2, name: "POST PILL", reg: 2500, ext: 2500 },
+        { id: 3, name: "EVENING PRIMROSE OIL", reg: 13200, ext: 13200 },
+        { id: 4, name: "BACK-UP emergency contraception pill", reg: 2000, ext: 2000 },
+        { id: 5, name: "WELL ROZE CAPSULES", reg: 6200, ext: 6200 },
+        { id: 6, name: "OMEGA -H3 BIO-TONIC CAPSULES", reg: 3000, ext: 3000 }
+      ],
+      "Medicine & Syrups": [
+        { id: 7, name: "AMATEM SOFTGEL FORTE", reg: 3000, ext: 3000 },
+        { id: 8, name: "LONART -DS", reg: 3700, ext: 3700 },
+        { id: 9, name: "MUREQL TABLET", reg: 1700, ext: 1700 },
+        { id: 10, name: "OBRON -6 PLUS IRON", reg: 1500, ext: 1500 },
+        { id: 11, name: "P-ALAXIN", reg: 2000, ext: 2000 },
+        { id: 12, name: "ARTEQUICK", reg: 6000, ext: 6000 },
+        { id: 13, name: "CO-MAL 20/120 TABLETS", reg: 1000, ext: 1000 },
+        { id: 14, name: "FEROGLOBIN B12", reg: 5800, ext: 5800 },
+        { id: 15, name: "STREPSILS INTENSIVE", reg: 3000, ext: 3000 },
+        { id: 16, name: "SIROP DYNEWELL PLUS", reg: 7500, ext: 7500 },
+        { id: 17, name: "DYNEWELL", reg: 4200, ext: 4200 },
+        { id: 18, name: "DE-DEON -5 SIROP", reg: 3500, ext: 3500 }
+      ],
+      "Appetizers & Others": [
+        { id: 19, name: "APETADINE SYRUP", reg: 2000, ext: 2000 },
+        { id: 20, name: "ASTYMIN", reg: 4500, ext: 4500 },
+        { id: 21, name: "ASTYFER", reg: 4500, ext: 4500 },
+        { id: 22, name: "AVRO APETIT SYRUP", reg: 1500, ext: 1500 },
+        { id: 23, name: "GOLD APETIT SYRUP", reg: 1500, ext: 1500 },
+        { id: 24, name: "KISS", reg: 550, ext: 550 },
+        { id: 25, name: "GOLD CIRCLE", reg: 500, ext: 500 },
+        { id: 26, name: "DUREX FEELS", reg: 1500, ext: 1500 }
+      ]
+    }
+  },
+  {
+    id: "yk_noodles",
+    name: "YK NOODLES",
+    address: "YK Location",
+    categories: {
+      "Main Course": [
+        { id: 1, name: "ROYAL (Noodles w/ Egg, sardine, sausage, Turkey)", reg: 7950, ext: 7950 },
+        { id: 2, name: "TROPICANA (Noodles w/ Egg, sardine, Turkey)", reg: 7150, ext: 7150 },
+        { id: 3, name: "TURKIT TOP (Noodles w/ Egg, sausage, Turkey)", reg: 6650, ext: 6650 },
+        { id: 4, name: "RELISH (Noodles w/ Egg, Turkey)", reg: 5850, ext: 5850 },
+        { id: 5, name: "SEA MIX (Noodles w/ Egg, sardine, sausage)", reg: 3950, ext: 3950 },
+        { id: 6, name: "DELIGHT (Noodles w/ Egg, sardine)", reg: 3150, ext: 3150 },
+        { id: 7, name: "BANGER (Noodles w/ Egg, sausage)", reg: 2650, ext: 2650 },
+        { id: 8, name: "CLASSIC (Noodles w/ Egg)", reg: 1850, ext: 1850 },
+        { id: 9, name: "PLANTAIN PLATTER (Plantain, Egg/Sausage)", reg: 0, ext: 0 } // Price missing, set to 0
+      ]
+    }
+  },
+  {
+    id: "big_mummy",
+    name: "BIG MUMMY’S KITCHEN",
+    address: "Big Mummy Location",
+    categories: {
+      "Rice Meals": [
+        { id: 1, name: "Small plate with chicken", reg: 2500, ext: 2500 },
+        { id: 2, name: "Big plate with chicken", reg: 3000, ext: 3000 },
+        { id: 3, name: "Small plate meat and Egg", reg: 2000, ext: 2000 }
+      ],
+      "Extras": [
+        { id: 4, name: "Extra chicken", reg: 1000, ext: 1000 },
+        { id: 5, name: "Extra meat", reg: 300, ext: 300 },
+        { id: 6, name: "Extra Egg", reg: 300, ext: 300 }
+      ]
+    }
+  },
+  {
+    id: "deemeallab",
+    name: "DEEMEALLAB – FOOD",
+    address: "Deemeallab Location",
+    categories: {
+      "Everyday Meal": [
+        { id: 1, name: "Spaghetti & Sauce", reg: 2000, ext: 2000 },
+        { id: 2, name: "Special Fried Rice", reg: 4000, ext: 4000 },
+        { id: 3, name: "Fried Rice", reg: 1500, ext: 1500 },
+        { id: 4, name: "Eba & Egusi", reg: 1800, ext: 1800 },
+        { id: 5, name: "White Rice & Beans", reg: 1700, ext: 1700 },
+        { id: 6, name: "Yam Porridge", reg: 1500, ext: 1500 },
+        { id: 7, name: "White Rice & Sauce", reg: 1500, ext: 1500 },
+        { id: 8, name: "White Rice", reg: 1000, ext: 1000 },
+        { id: 9, name: "Plantain", reg: 500, ext: 500 },
+        { id: 10, name: "Coleslaw", reg: 1500, ext: 1500 },
+        { id: 11, name: "Bread", reg: 1200, ext: 1200 },
+        { id: 12, name: "Samosa / Chops", reg: 1500, ext: 1500 },
+        { id: 13, name: "Noodles", reg: 1500, ext: 1500 }
+      ],
+      "Monday Special": [
+        { id: 14, name: "Catfish Stew", reg: 2000, ext: 2000 },
+        { id: 15, name: "Toast Bread + Coffee", reg: 3500, ext: 3500 },
+        { id: 16, name: "Tapioca (Milk & Sugar)", reg: 3000, ext: 3000 },
+        { id: 17, name: "Efo Riro / Pounded Yam or Eba", reg: 2500, ext: 2500 },
+        { id: 18, name: "Moi Moi", reg: 3000, ext: 3000 }
+      ],
+      "Proteins": [
+        { id: 19, name: "Chicken Wings", reg: 2500, ext: 2500 },
+        { id: 20, name: "Beef", reg: 1000, ext: 1000 },
+        { id: 21, name: "Assorted", reg: 1000, ext: 1000 },
+        { id: 22, name: "Ponmo", reg: 1000, ext: 1000 },
+        { id: 23, name: "Kote Fish", reg: 1000, ext: 1000 },
+        { id: 24, name: "Panla", reg: 1000, ext: 1000 },
+        { id: 25, name: "Egg", reg: 500, ext: 500 },
+        { id: 26, name: "Titus Fish", reg: 2500, ext: 2500 },
+        { id: 27, name: "Snail", reg: 2500, ext: 2500 },
+        { id: 28, name: "Chicken", reg: 2500, ext: 2500 },
+        { id: 29, name: "Turkey", reg: 4500, ext: 4500 },
+        { id: 30, name: "Gizzard", reg: 1000, ext: 1000 },
+        { id: 31, name: "Catfish", reg: 2500, ext: 2500 },
+        { id: 32, name: "Smoked Catfish", reg: 2500, ext: 2500 },
+        { id: 33, name: "Goat Meat", reg: 2500, ext: 2500 }
+      ]
+    }
+  },
+  {
+    id: "savore",
+    name: "SAVORÉ BY ADEBAYO",
+    address: "Savoré Location",
+    categories: {
+      "Small Plates (With Peppered Chicken)": [
+        { id: 1, name: "Fried Rice & Jollof Rice", reg: 3000, ext: 3000 },
+        { id: 2, name: "Jollof Rice Only", reg: 3000, ext: 3000 },
+        { id: 3, name: "Stir-fry Fried Rice Only", reg: 3000, ext: 3000 },
+        { id: 4, name: "Stir-fried Spaghetti", reg: 3200, ext: 3200 }
+      ],
+      "Big Plates (With Peppered Chicken)": [
+        { id: 5, name: "Fried Rice & Jollof Rice", reg: 4000, ext: 4000 },
+        { id: 6, name: "Jollof Rice Only", reg: 4000, ext: 4000 },
+        { id: 7, name: "Stir-fry Fried Rice Only", reg: 4000, ext: 4000 },
+        { id: 8, name: "Stir-fried Spaghetti", reg: 4200, ext: 4200 }
+      ],
+      "Small Plates (With Peppered Turkey)": [
+        { id: 9, name: "Fried Rice & Jollof Rice", reg: 4000, ext: 4000 },
+        { id: 10, name: "Jollof Rice Only", reg: 4000, ext: 4000 },
+        { id: 11, name: "Stir-fry Fried Rice Only", reg: 4000, ext: 4000 },
+        { id: 12, name: "Stir-fried Spaghetti", reg: 4200, ext: 4200 }
+      ],
+      "Big Plates (With Peppered Turkey)": [
+        { id: 13, name: "Fried Rice & Jollof Rice", reg: 5500, ext: 5500 },
+        { id: 14, name: "Jollof Rice Only", reg: 5500, ext: 5500 },
+        { id: 15, name: "Stir-fry Fried Rice Only", reg: 5500, ext: 5500 },
+        { id: 16, name: "Stir-fried Spaghetti", reg: 5700, ext: 5700 }
+      ],
+      "Extras & Bento Cakes": [
+        { id: 17, name: "Plantain", reg: 500, ext: 500 },
+        { id: 18, name: "Coleslaw", reg: 500, ext: 500 },
+        { id: 19, name: "Extra Chicken", reg: 1500, ext: 1500 },
+        { id: 20, name: "Extra Turkey", reg: 3000, ext: 3000 },
+        { id: 21, name: "Basic Bento", reg: 8500, ext: 8500 },
+        { id: 22, name: "Whipped Cream Bento", reg: 10000, ext: 10000 }
+      ]
+    }
+  },
+  {
+    id: "royal_chaw",
+    name: "ROYAL CHAW SPOT",
+    address: "Royal Chaw Location",
+    categories: {
+      "Sharwama": [
+        { id: 1, name: "Without sausage", reg: 2000, ext: 2000 },
+        { id: 2, name: "Single sausage", reg: 2500, ext: 2500 },
+        { id: 3, name: "Double sausage", reg: 3000, ext: 3000 },
+        { id: 4, name: "Royal special", reg: 4000, ext: 4000 },
+        { id: 5, name: "Chessy sharwama", reg: 4000, ext: 4000 }
+      ],
+      "Burger & Fries": [
+        { id: 6, name: "Single chicken Burger", reg: 5000, ext: 5000 },
+        { id: 7, name: "Double chicken Burger", reg: 6000, ext: 6000 },
+        { id: 8, name: "Loaded fries", reg: 5000, ext: 5000 },
+        { id: 9, name: "Loaded fries with cheese", reg: 6000, ext: 6000 },
+        { id: 10, name: "Chicken and fried", reg: 5000, ext: 5000 },
+        { id: 11, name: "Extra chicken", reg: 1500, ext: 1500 },
+        { id: 12, name: "Extra fries", reg: 1000, ext: 1000 }
+      ],
+      "Bread Sharwama & Others": [
+        { id: 13, name: "Without sausage", reg: 2000, ext: 2000 },
+        { id: 14, name: "Single sausage", reg: 2500, ext: 2500 },
+        { id: 15, name: "Double sausage", reg: 3000, ext: 3000 },
+        { id: 16, name: "Jumbo bread sharwama", reg: 3500, ext: 3500 },
+        { id: 17, name: "Sandwich", reg: 700, ext: 700 },
+        { id: 18, name: "Royal pizza", reg: 10000, ext: 10000 },
+        { id: 19, name: "Barbecue", reg: 4000, ext: 6500 }, // S/M/L
+        { id: 20, name: "Nkwobi", reg: 4000, ext: 6000 } // Small/Large
+      ]
+    }
+  },
+  {
+    id: "hot_oole",
+    name: "HOT OOLE",
+    address: "Hot Oole Location",
+    categories: {
+      "Moi Moi & Pap": [
+        { id: 1, name: "Special combo moi moi", reg: 1500, ext: 1500 },
+        { id: 2, name: "Moi moi with Egg", reg: 700, ext: 700 },
+        { id: 3, name: "Moi moi (plain)", reg: 400, ext: 400 },
+        { id: 4, name: "Moi moi with fish", reg: 600, ext: 600 },
+        { id: 5, name: "Breakfast combo: Pap and milk with moi moi", reg: 3000, ext: 3000 },
+        { id: 6, name: "Breakfast combo: Tapioca and milk and moi moi", reg: 3000, ext: 3000 }
+      ],
+      "Tapioca & Fura": [
+        { id: 7, name: "Tapioca (small bowl)", reg: 1200, ext: 1200 },
+        { id: 8, name: "Tapioca (big bowl)", reg: 1500, ext: 1500 },
+        { id: 9, name: "Fura (small bowl)", reg: 1200, ext: 1200 },
+        { id: 10, name: "Fura (big bowl)", reg: 1500, ext: 1500 },
+        { id: 11, name: "Extra milk", reg: 300, ext: 300 }
+      ],
+      "Drinks": [
+        { id: 12, name: "Kunu", reg: 1000, ext: 1000 },
+        { id: 13, name: "Zobo", reg: 1000, ext: 1000 }
+      ]
+    }
+  },
+  {
+    id: "wrap_star",
+    name: "WRAP STAR MENU",
+    address: "Wrap Star Location",
+    categories: {
+      "SHARWAMA": [
+        { id: 1, name: "Chicken alone", reg: 2500, ext: 2500 },
+        { id: 2, name: "Beef alone", reg: 2800, ext: 2800 },
+        { id: 3, name: "Single sausage", reg: 2700, ext: 2700 },
+        { id: 4, name: "Double sausage", reg: 3000, ext: 3000 },
+        { id: 5, name: "Chicken & beef", reg: 3000, ext: 3000 },
+        { id: 6, name: "Chicken, Beef & A sausage", reg: 3500, ext: 3500 },
+        { id: 7, name: "Chicken, Beef & 2 sausage", reg: 3800, ext: 3800 },
+        { id: 8, name: "Sharwama special", reg: 4500, ext: 4500 }
+      ],
+      "BURGER": [
+        { id: 9, name: "Single chicken", reg: 4500, ext: 4500 },
+        { id: 10, name: "Double chicken", reg: 5000, ext: 5000 },
+        { id: 11, name: "Beef suya", reg: 4500, ext: 4500 }
+      ],
+      "FRIES": [
+        { id: 12, name: "Fries & chicken", reg: 5500, ext: 5500 },
+        { id: 13, name: "Beef kebab", reg: 2000, ext: 2000 },
+        { id: 14, name: "Kebab & FRIES", reg: 4500, ext: 4500 },
+        { id: 15, name: "FRIES combo", reg: 7000, ext: 7000 },
+        { id: 16, name: "Loaded fries", reg: 6000, ext: 6000 }
+      ]
+    }
+  },
+  {
+    id: "chao_cocina",
+    name: "CHAO COCINA",
+    address: "Chao Cocina Location",
+    categories: {
+      "STIRFRY SPAGHETTI": [
+        { id: 1, name: "Large with turkey", reg: 3800, ext: 3800 },
+        { id: 2, name: "Medium with turkey", reg: 3300, ext: 3300 },
+        { id: 3, name: "Large with asun", reg: 3300, ext: 3300 },
+        { id: 4, name: "Medium with asun", reg: 3000, ext: 3000 },
+        { id: 5, name: "Extra/only turkey", reg: 2800, ext: 2800 },
+        { id: 6, name: "Extra/only asun", reg: 2000, ext: 2000 },
+        { id: 7, name: "Extra stirfry", reg: 1000, ext: 1000 },
+        { id: 8, name: "Extra sausage", reg: 400, ext: 400 }
+      ],
+      "Potato fries": [
+        { id: 9, name: "Fries & turkey", reg: 5500, ext: 5500 },
+        { id: 10, name: "Fries & Asun", reg: 5000, ext: 5000 },
+        { id: 11, name: "Plantain per portion", reg: 500, ext: 500 },
+        { id: 12, name: "Ketchup", reg: 300, ext: 300 }
+      ],
+      "Drinks": [
+        { id: 13, name: "Bottle water", reg: 300, ext: 300 },
+        { id: 14, name: "Soft drinks", reg: 500, ext: 500 },
+        { id: 15, name: "Fearless", reg: 600, ext: 600 },
+        { id: 16, name: "Malt", reg: 600, ext: 600 },
+        { id: 17, name: "Fayrouz", reg: 800, ext: 800 },
+        { id: 18, name: "Chivita active", reg: 800, ext: 800 }
+      ]
+    }
+  },
+  {
+    id: "krafty_kitchen",
+    name: "KRAFTY KITCHEN",
+    address: "Krafty Kitchen Location",
+    categories: {
+      "FOOD MENU": [
+        { id: 1, name: "Small plate with chicken", reg: 2500, ext: 2500 },
+        { id: 2, name: "Big plate with chicken", reg: 3000, ext: 3000 },
+        { id: 3, name: "Plantain", reg: 500, ext: 500 },
+        { id: 4, name: "Coleslaw", reg: 500, ext: 500 },
+        { id: 5, name: "Extra chicken", reg: 2000, ext: 2000 },
+        { id: 6, name: "Ofada Rice with chicken, egg & assorted", reg: 4500, ext: 4500 },
+        { id: 7, name: "Krafty fruit parfait (Big cup)", reg: 4000, ext: 4000 },
+        { id: 8, name: "Krafty fruit parfait (small cup)", reg: 3500, ext: 3500 },
+        { id: 9, name: "Fish barbecue", reg: 3000, ext: 3000 },
+        { id: 10, name: "Big plate of pasta with chicken", reg: 3500, ext: 3500 },
+        { id: 11, name: "Small plate of pasta with chicken", reg: 3000, ext: 3000 },
+        { id: 12, name: "Big plate of pasta with beef", reg: 2700, ext: 2700 },
+        { id: 13, name: "Small plate of pasta with beef", reg: 2200, ext: 2200 },
+        { id: 14, name: "Small plate of rice with beef", reg: 1700, ext: 1700 },
+        { id: 15, name: "Big plate of rice with beef", reg: 2200, ext: 2200 },
+        { id: 16, name: "Beef", reg: 500, ext: 500 },
+        { id: 17, name: "Egg", reg: 400, ext: 400 }
+      ],
+      "DRINKS": [
+        { id: 18, name: "Viju milk", reg: 700, ext: 700 },
+        { id: 19, name: "Coke", reg: 500, ext: 500 },
+        { id: 20, name: "Fanta", reg: 500, ext: 500 },
+        { id: 21, name: "Bottle water", reg: 250, ext: 250 },
+        { id: 22, name: "Pepsi", reg: 500, ext: 500 },
+        { id: 23, name: "Predator", reg: 600, ext: 600 },
+        { id: 24, name: "Fearless", reg: 600, ext: 600 },
+        { id: 25, name: "Zobo", reg: 800, ext: 800 },
+        { id: 26, name: "Exotic", reg: 800, ext: 800 },
+        { id: 27, name: "Active can", reg: 800, ext: 800 },
+        { id: 28, name: "Exotic Big", reg: 1800, ext: 1800 },
+        { id: 29, name: "Monster", reg: 1500, ext: 1500 },
+        { id: 30, name: "Berry blast", reg: 1500, ext: 1500 },
+        { id: 31, name: "Puppy orange", reg: 1500, ext: 1500 },
+        { id: 32, name: "Nutri milk", reg: 700, ext: 700 }
+      ],
+      "KRAFTY SHARWAMA": [
+        { id: 33, name: "Sharwama without sausage", reg: 2000, ext: 2000 },
+        { id: 34, name: "Chicken sharwama", reg: 2500, ext: 2500 },
+        { id: 35, name: "Beef sharwama", reg: 2500, ext: 2500 },
+        { id: 36, name: "Sharwama combo", reg: 3000, ext: 3000 },
+        { id: 37, name: "Sharwama & single sausage", reg: 2500, ext: 2500 },
+        { id: 38, name: "Sharwama & Double sausage", reg: 3000, ext: 3000 },
+        { id: 39, name: "Special sharwama with a free drink", reg: 4000, ext: 4000 }
+      ]
+    }
+  },
+  {
+    id: "spag_city",
+    name: "SPAG CITY",
+    address: "Spag City Location",
+    categories: {
+      "Spaghetti": [
+        { id: 1, name: "Spag & Big Turkey", reg: 6500, ext: 6500 },
+        { id: 2, name: "Spag & mid turkey", reg: 4000, ext: 4000 },
+        { id: 3, name: "Spag & chicken", reg: 3600, ext: 3600 }
+      ],
+      "Sharwama & Extras": [
+        { id: 4, name: "Sharwama single sausage", reg: 2500, ext: 2500 },
+        { id: 5, name: "Double sausage", reg: 3000, ext: 3000 },
+        { id: 6, name: "Sausage", reg: 500, ext: 500 },
+        { id: 7, name: "Plantain", reg: 500, ext: 500 },
+        { id: 8, name: "Coleslaw", reg: 500, ext: 500 },
+        { id: 9, name: "Extra beef", reg: 500, ext: 500 },
+        { id: 10, name: "Asun", reg: 2000, ext: 2000 }
+      ]
+    }
+  },
+  {
+    id: "hd_treats",
+    name: "HD TREATS",
+    address: "HD Treats Location",
+    categories: {
+      "Burger": [
+        { id: 1, name: "Single Chicken Burger", reg: 5000, ext: 5000 },
+        { id: 2, name: "Double Chicken Burger", reg: 7000, ext: 7000 },
+        { id: 3, name: "Single Beef Burger", reg: 5000, ext: 5000 },
+        { id: 4, name: "Double Beef Burger", reg: 7000, ext: 7000 }
+      ],
+      "Shawarma": [
+        { id: 5, name: "Beef Shawarma", reg: 3500, ext: 3500 },
+        { id: 6, name: "Chicken Shawarma", reg: 3500, ext: 3500 },
+        { id: 7, name: "Jumbo Shawarma", reg: 5000, ext: 5000 },
+        { id: 8, name: "Extra Sausage", reg: 500, ext: 500 },
+        { id: 9, name: "Extra Chicken", reg: 500, ext: 500 }
+      ],
+      "Sandwich": [
+        { id: 10, name: "Club Chicken Sandwich", reg: 3500, ext: 3500 },
+        { id: 11, name: "Club Beef Sandwich", reg: 3500, ext: 3500 },
+        { id: 12, name: "Philly Cheese Steak", reg: 7000, ext: 7000 },
+        { id: 13, name: "Chicken Cheese Melt", reg: 7000, ext: 7000 }
+      ],
+      "Beverages & Parfait": [
+        { id: 14, name: "Fruity Zobo", reg: 1500, ext: 1500 },
+        { id: 15, name: "Pineapple Juice", reg: 2500, ext: 2500 },
+        { id: 16, name: "Watermelon Juice", reg: 2500, ext: 2500 },
+        { id: 17, name: "Creamy Yoghurt", reg: 2500, ext: 2500 },
+        { id: 18, name: "Yoghurt Parfait (500ml)", reg: 6500, ext: 6500 },
+        { id: 19, name: "Yoghurt Parfait (1 litre)", reg: 12500, ext: 12500 },
+        { id: 20, name: "Greek Yoghurt Sweetened/Unsweetened (500ml)", reg: 5000, ext: 5000 },
+        { id: 21, name: "Greek Yoghurt Sweetened/Unsweetened (1 litre)", reg: 9500, ext: 9500 }
+      ],
+      "Milkshake & Pizza": [
+        { id: 22, name: "Vanilla Milkshake", reg: 7000, ext: 7000 },
+        { id: 23, name: "Oreo Milkshake", reg: 7000, ext: 7000 },
+        { id: 24, name: "Strawberry Milkshake", reg: 7000, ext: 7000 },
+        { id: 25, name: "Banana Milkshake", reg: 7000, ext: 7000 },
+        { id: 26, name: "Beef Pizza", reg: 6000, ext: 10000 }, // S/L
+        { id: 27, name: "Chicken Pizza", reg: 6000, ext: 10000 }, // S/L
+        { id: 28, name: "Margherita Pizza", reg: 6000, ext: 10000 }, // S/L
+        { id: 29, name: "Pepperoni Pizza", reg: 7000, ext: 11000 }, // S/L
+        { id: 30, name: "BBQ Pizza", reg: 8000, ext: 12000 }, // S/L
+        { id: 31, name: "Supreme Pizza", reg: 10000, ext: 16000 } // S/L
+      ]
+    }
+  },
+  {
+    id: "imole_patisserie",
+    name: "IMOLE’S PATISSERIE",
+    address: "Imole Location",
+    categories: {
+      "Pastries & Snacks": [
+        { id: 1, name: "Chicken pie", reg: 1000, ext: 1000 },
+        { id: 2, name: "Meatpie", reg: 1000, ext: 1000 },
+        { id: 3, name: "Sausage roll", reg: 500, ext: 500 },
+        { id: 4, name: "Full sausage", reg: 1000, ext: 1000 },
+        { id: 5, name: "Egg rolls", reg: 500, ext: 500 },
+        { id: 6, name: "Milky doughnuts pack of 3", reg: 4500, ext: 4500 },
+        { id: 7, name: "Milky doughnuts pack of 6", reg: 8500, ext: 8500 },
+        { id: 8, name: "Small chops with chicken", reg: 3500, ext: 3500 },
+        { id: 9, name: "Small chops with beef", reg: 2500, ext: 2500 },
+        { id: 10, name: "Ice cream covered plates", reg: 1000, ext: 2200 }
+      ],
+      "Cakes & Parfaits": [
+        { id: 11, name: "Cake slice cakes (naked big)", reg: 2500, ext: 2500 },
+        { id: 12, name: "Cake slice cakes (customized)", reg: 4000, ext: 4000 },
+        { id: 13, name: "Birthday cakes size 6 single layer", reg: 15000, ext: 15000 },
+        { id: 14, name: "Birthday cakes size 8 single layer", reg: 20000, ext: 20000 },
+        { id: 15, name: "Birthday cakes size 10 single layer", reg: 25000, ext: 25000 },
+        { id: 16, name: "Cake parfaits small", reg: 3500, ext: 3500 },
+        { id: 17, name: "Cake parfaits big", reg: 4500, ext: 4500 }
+      ]
+    }
+  },
+  {
+    id: "finey_prices",
+    name: "FINEY PRICES",
+    address: "Finey Location",
+    categories: {
+      "Noodles": [
+        { id: 1, name: "Stirfry noodles with beef or boiled egg", reg: 1800, ext: 1800 },
+        { id: 2, name: "Noodles with fried egg", reg: 2000, ext: 2000 },
+        { id: 3, name: "Stirfry noodles with chicken", reg: 3000, ext: 3000 },
+        { id: 4, name: "Stirfry noodles with fish", reg: 2800, ext: 2800 },
+        { id: 5, name: "Stirfry noodles with turkey", reg: 4500, ext: 5000 }
+      ],
+      "Peppered Menu": [
+        { id: 6, name: "Gizdodo or asun mini", reg: 2000, ext: 2000 },
+        { id: 7, name: "Gizdodo or asun maxi", reg: 5000, ext: 5000 },
+        { id: 8, name: "Peppered snails", reg: 2500, ext: 5000 },
+        { id: 9, name: "Peppered ponmo", reg: 1500, ext: 3000 },
+        { id: 10, name: "Peppered beef and plantain", reg: 3500, ext: 6500 },
+        { id: 11, name: "Peppered goat meat and plantain", reg: 4000, ext: 7500 },
+        { id: 12, name: "Peppered chicken and plantain", reg: 3500, ext: 6500 },
+        { id: 13, name: "Peppered turkey and plantain", reg: 5000, ext: 9500 }
+      ]
+    }
+  },
+  {
+    id: "royals_treat",
+    name: "ROYAL’S TREAT AND TIDBITS",
+    address: "Royals Treat Location",
+    categories: {
+      "Main Meals": [
+        { id: 1, name: "Stir fry spaghetti with chicken", reg: 4500, ext: 4500 },
+        { id: 2, name: "Extra plate stir fry spaghetti with chicken", reg: 5500, ext: 5500 },
+        { id: 3, name: "Yam and egg sauce", reg: 4500, ext: 4500 },
+        { id: 4, name: "Basmati Jambalaya rice and turkey", reg: 8500, ext: 8500 },
+        { id: 5, name: "Stir spaghetti chicken and plantain", reg: 5000, ext: 5000 },
+        { id: 6, name: "Basmati rice and gizzdodo", reg: 7000, ext: 7000 }
+      ],
+      "Snacks & Extras": [
+        { id: 7, name: "Small chops (Combo)", reg: 4500, ext: 4500 },
+        { id: 8, name: "Chicken pie and meat pie", reg: 1200, ext: 1200 },
+        { id: 9, name: "Buns", reg: 200, ext: 200 },
+        { id: 10, name: "Doughnuts", reg: 700, ext: 700 },
+        { id: 11, name: "Egg roll", reg: 700, ext: 700 },
+        { id: 12, name: "Fruit parfait", reg: 4500, ext: 4500 },
+        { id: 13, name: "Cake parfait", reg: 3500, ext: 3500 }
+      ]
+    }
+  },
+  {
+    id: "okele_joint",
+    name: "OKELE JOINT",
+    address: "Okele Joint Location",
+    categories: {
+      "SWALLOWS": [
+        { id: 1, name: "Amala", reg: 300, ext: 300 },
+        { id: 2, name: "Pounded yam", reg: 500, ext: 500 },
+        { id: 3, name: "Semo", reg: 200, ext: 200 },
+        { id: 4, name: "Fufu", reg: 200, ext: 200 },
+        { id: 5, name: "Eba", reg: 200, ext: 200 },
+        { id: 6, name: "Tuwo Rice", reg: 200, ext: 200 }
+      ],
+      "Proteins & Soup": [
+        { id: 7, name: "Cow Meat", reg: 200, ext: 200 },
+        { id: 8, name: "Goat Meat", reg: 500, ext: 500 },
+        { id: 9, name: "Fish", reg: 1000, ext: 2000 },
+        { id: 10, name: "Wara", reg: 300, ext: 300 },
+        { id: 11, name: "Ponmo", reg: 300, ext: 300 },
+        { id: 12, name: "Cow Leg", reg: 400, ext: 500 },
+        { id: 13, name: "Chicken", reg: 1500, ext: 1500 },
+        { id: 14, name: "Smoke Fish", reg: 500, ext: 500 },
+        { id: 15, name: "Hake Fish", reg: 1000, ext: 1000 }
+      ]
+    }
+  },
+  {
+    id: "iya_afusat",
+    name: "Iya Afusat Kitchen",
+    address: "Iya Afusat Location",
+    categories: {
+      "Rice & Beans": [
+        { id: 1, name: "White rice", reg: 500, ext: 1000 },
+        { id: 2, name: "Rice and bean", reg: 500, ext: 1000 },
+        { id: 3, name: "Jollof rice", reg: 500, ext: 1000 },
+        { id: 4, name: "Bean", reg: 500, ext: 1000 },
+        { id: 5, name: "Plantain", reg: 200, ext: 200 },
+        { id: 6, name: "Spag", reg: 200, ext: 200 },
+        { id: 7, name: "Bread", reg: 500, ext: 500 }
+      ],
+      "SWALLOWS": [
+        { id: 8, name: "Semo", reg: 200, ext: 200 },
+        { id: 9, name: "Eba", reg: 200, ext: 200 },
+        { id: 10, name: "Fufu", reg: 200, ext: 200 },
+        { id: 11, name: "Iyan", reg: 200, ext: 200 },
+        { id: 12, name: "Amala", reg: 200, ext: 200 }
+      ],
+      "Protein": [
+        { id: 13, name: "Beef", reg: 200, ext: 500 },
+        { id: 14, name: "Ponmo", reg: 500, ext: 500 },
+        { id: 15, name: "Titus fish", reg: 1000, ext: 1000 },
+        { id: 16, name: "Wara", reg: 500, ext: 500 },
+        { id: 17, name: "Egg", reg: 400, ext: 400 }
+      ]
+    }
+  },
+  {
+    id: "jamblack_hubs",
+    name: "JAMBLACK HUBS",
+    address: "Jamblack Location",
+    categories: {
+      "Shawarma": [
+        { id: 1, name: "Medium", reg: 3500, ext: 3500 },
+        { id: 2, name: "Large", reg: 5000, ext: 5000 }
+      ],
+      "Pasta & Meals": [
+        { id: 3, name: "Spaghetti with Chicken", reg: 3500, ext: 3500 },
+        { id: 4, name: "Spaghetti with Turkey", reg: 5500, ext: 5500 },
+        { id: 5, name: "Penne Pasta with Chicken", reg: 4500, ext: 4500 }
+      ],
+      "Extras / Add-Ons": [
+        { id: 6, name: "Turkey", reg: 6500, ext: 6500 },
+        { id: 7, name: "Toast Bread", reg: 700, ext: 700 },
+        { id: 8, name: "Beef", reg: 500, ext: 500 },
+        { id: 9, name: "Ponmo", reg: 500, ext: 500 },
+        { id: 10, name: "Sausage", reg: 500, ext: 500 },
+        { id: 11, name: "Plantain", reg: 500, ext: 500 }
+      ]
+    }
+  },
+  {
+    id: "opeyemi_food",
+    name: "OPEYEMI FOOD CANTEEN",
+    address: "Opeyemi Food Location",
+    categories: {
+      "SWALLOWS": [
+        { id: 1, name: "Pounded Yam", reg: 600, ext: 600 },
+        { id: 2, name: "Amala", reg: 200, ext: 200 },
+        { id: 3, name: "Eba", reg: 200, ext: 200 },
+        { id: 4, name: "Semo", reg: 200, ext: 200 }
+      ],
+      "Proteins": [
+        { id: 5, name: "Beef", reg: 500, ext: 500 },
+        { id: 6, name: "Turkey", reg: 4000, ext: 4000 },
+        { id: 7, name: "Ponmo", reg: 500, ext: 500 },
+        { id: 8, name: "Titus fish", reg: 2000, ext: 2000 },
+        { id: 9, name: "Wara", reg: 500, ext: 500 }
+      ]
+    }
+  }
+];
 
 // --- 5. HELPERS ---
 function generateId() {
@@ -103,10 +740,9 @@ app.post('/whatsapp', async (req, res) => {
     if (numMedia > 0) {
       const userSnap = await db.ref(`users/${from}`).once('value');
       const user = userSnap.val();
-      const mediaUrl = req.body.MediaUrl0; 
       
       if (user && user.step === 'awaiting_payment') {
-        await createOrderInDB(from, user, twiml, mediaUrl);
+        await createOrderInDB(from, user, twiml, req.body.MediaUrl0);
         return res.type('text/xml').send(twiml.toString());
       } else {
         twiml.message("Please complete the text steps first. Reply 'Menu' to restart.");
@@ -143,14 +779,12 @@ app.post('/whatsapp', async (req, res) => {
         return res.type('text/xml').send(twiml.toString());
     }
 
-    // --- CHECK ACTIVE ORDER STATUS (BLOCKING STATE) ---
-    // If user has a recent order that is pending or seeking rider, ignore all other inputs
+    // --- CHECK ACTIVE ORDER STATUS ---
     const orderId = user.last_order_id;
     if (orderId) {
         const orderSnap = await db.ref(`orders/${orderId}`).once('value');
         const order = orderSnap.val();
         
-        // Only block if the order is in a "waiting" phase
         if (order && (order.status === 'pending_payment' || order.status === 'seeking_rider' || order.status === 'rider_accepted')) {
             let msg = "";
             if (order.status === 'pending_payment') {
@@ -160,7 +794,6 @@ app.post('/whatsapp', async (req, res) => {
             } else if (order.status === 'rider_accepted') {
                 msg = "⏳ *Rider Assigned*\n\nYour order has been accepted by a rider.\n\nDon't reply here. Contact the rider directly.";
             }
-
             twiml.message(msg);
             return res.type('text/xml').send(twiml.toString());
         }
@@ -220,8 +853,17 @@ app.post('/whatsapp', async (req, res) => {
         await handleMainMenu(from, msg, twiml);
         break;
       case 'vendor_select':
-        if (msg === '1') await showCategories(from, twiml);
-        else twiml.message("Invalid option. Reply 1.");
+        const vendorIndex = parseInt(msg) - 1;
+        if (vendorIndex >= 0 && vendorIndex < VENDORS.length) {
+            const selectedVendor = VENDORS[vendorIndex];
+            await db.ref(`users/${from}`).update({
+            step: 'category_select',
+            selected_vendor_id: selectedVendor.id
+            });
+            await showCategories(from, twiml);
+        } else {
+            twiml.message("Invalid vendor number. Please try again.");
+        }
         break;
       case 'category_select':
         await handleCategorySelect(from, parseInt(msg), twiml);
@@ -234,6 +876,9 @@ app.post('/whatsapp', async (req, res) => {
         break;
       case 'quantity_select':
         await handleQuantitySelect(from, msg, twiml);
+        break;
+      case 'soup_select': // NEW STEP FOR SOUP
+        await handleSoupSelect(from, msg, twiml);
         break;
       case 'protein_loop':
         await handleProteinLoop(from, msg, twiml);
@@ -263,7 +908,6 @@ app.post('/whatsapp', async (req, res) => {
       case 'errand_details':
         await handleErrandDetails(from, originalMsg, twiml);
         break;
-      // --- NEW PICKUP FLOW STEPS ---
       case 'pickup_description':
         await handlePickupDescription(from, originalMsg, twiml);
         break;
@@ -273,7 +917,6 @@ app.post('/whatsapp', async (req, res) => {
       case 'vendor_phone':
         await handleVendorPhone(from, originalMsg, twiml);
         break;
-      // -----------------------------
       case 'customer_name':
         await handleCustomerName(from, originalMsg, twiml);
         break;
@@ -327,7 +970,14 @@ async function handleMainMenu(from, msg, twiml) {
       step: 'vendor_select',
       order_type: 'food'
     });
-    twiml.message(`🏪 *Select Vendor*\n\n1. ${VENDOR_NAME}\n\nReply 1.`);
+
+    let menuText = `🏪 *Select a Vendor*\n\n`;
+    VENDORS.forEach((v, index) => {
+      menuText += `${index + 1}. ${v.name}\n`;
+    });
+    menuText += `\nReply with the vendor number.`;
+    twiml.message(menuText);
+
   } else if (msg === '2') {
     await db.ref(`users/${from}`).update({
       step: 'errand_type',
@@ -341,26 +991,44 @@ async function handleMainMenu(from, msg, twiml) {
 
 async function showCategories(from, twiml) {
   await db.ref(`users/${from}/step`).set('category_select');
-  let msg = `🍽️ *${VENDOR_NAME} Categories*\n\n`;
-  msg += `1. 🍚 Rice Meals\n2. 🥘 Swallow & Solids\n3. 🍗 Proteins / Add-ons\n\nReply number.`;
+  
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const user = userSnap.val();
+  const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
+
+  if (!vendor) {
+    twiml.message("Error finding vendor. Please restart.");
+    return;
+  }
+
+  let msg = `🍽️ *${vendor.name} Categories*\n\n`;
+  const catKeys = Object.keys(vendor.categories);
+  
+  catKeys.forEach((key, index) => {
+    msg += `${index + 1}. ${key.replace('_', ' ')}\n`;
+  });
+  
+  msg += `\nReply number.`;
   twiml.message(msg);
 }
 
 async function handleCategorySelect(from, choice, twiml) {
-  let categoryKey = '';
-  if (choice === 1) categoryKey = 'RICE_MEALS';
-  if (choice === 2) categoryKey = 'SWALLOWS';
-  if (choice === 3) categoryKey = 'PROTEINS';
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const user = userSnap.val();
+  const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
+  
+  const catKeys = Object.keys(vendor.categories);
+  const selectedKey = catKeys[choice - 1];
 
-  if (!categoryKey) return twiml.message("Invalid category. Reply 1, 2, or 3.");
+  if (!selectedKey) return twiml.message("Invalid category number.");
 
   await db.ref(`users/${from}`).update({
     step: 'item_select',
-    current_category: categoryKey
+    current_category: selectedKey
   });
 
-  let msg = `*${categoryKey.replace('_', ' ')}*\n\n`;
-  MENU_CATEGORIES[categoryKey].forEach(item => {
+  let msg = `*${selectedKey.replace('_', ' ')}*\n\n`;
+  vendor.categories[selectedKey].forEach(item => {
     const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`;
     msg += `${item.id}. ${item.name} - ${priceTxt}\n`;
   });
@@ -371,7 +1039,9 @@ async function handleCategorySelect(from, choice, twiml) {
 async function handleItemSelect(from, id, twiml) {
   const userSnap = await db.ref(`users/${from}`).once('value');
   const user = userSnap.val();
-  const cat = MENU_CATEGORIES[user.current_category];
+  const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
+  
+  const cat = vendor.categories[user.current_category];
   const item = cat.find(i => i.id === id);
 
   if (!item) return twiml.message("Invalid item number.");
@@ -422,19 +1092,46 @@ async function handleQuantitySelect(from, msg, twiml) {
   const item = userSnap.val().selected_item;
   const price = user.selected_item_price || item.reg;
   const size = user.selected_size || (item.reg === item.ext ? 'Regular' : 'Regular');
+  const currentCategory = user.current_category;
 
+  // Logic for Swallows + Free Soup
+  if (currentCategory.includes('Swallow') || currentCategory === 'SWALLOWS') {
+      // Save the item details temporarily
+      const tempItem = {
+          name: item.name,
+          price: price,
+          qty: qty,
+          size: size,
+          type: 'swallow'
+      };
+
+      await db.ref(`users/${from}`).update({
+          step: 'soup_select',
+          temp_swallow_item: tempItem
+      });
+
+      let soupList = `🍲 *Select your Free Soup*\n\n`;
+      FREE_SOUPS.forEach((s, i) => {
+          soupList += `${i + 1}. ${s}\n`;
+      });
+      soupList += `\nReply number.`;
+      twiml.message(soupList);
+      return;
+  }
+
+  // Standard Item Logic
   const newItem = {
     name: item.name,
     price: price,
     qty: qty,
     size: size,
-    type: user.current_category === 'PROTEINS' ? 'protein' : 'main'
+    type: currentCategory.includes('Protein') ? 'protein' : 'main'
   };
 
   const cart = user.cart || [];
   cart.push(newItem);
 
-  if (user.current_category !== 'PROTEINS') {
+  if (!currentCategory.includes('Protein')) {
     await db.ref(`users/${from}`).update({
       step: 'protein_loop',
       cart: cart
@@ -445,18 +1142,79 @@ async function handleQuantitySelect(from, msg, twiml) {
   }
 }
 
+// --- NEW: HANDLE SOUP SELECTION ---
+async function handleSoupSelect(from, msg, twiml) {
+    const userSnap = await db.ref(`users/${from}`).once('value');
+    const user = userSnap.val();
+    const tempItem = user.temp_swallow_item;
+
+    const soupIndex = parseInt(msg) - 1;
+    if (soupIndex < 0 || soupIndex >= FREE_SOUPS.length) {
+        return twiml.message("Invalid selection. Please reply 1-" + FREE_SOUPS.length);
+    }
+
+    const selectedSoup = FREE_SOUPS[soupIndex];
+
+    // Update the name with the soup
+    const finalItem = {
+        ...tempItem,
+        name: `${tempItem.name} (${selectedSoup})`
+    };
+
+    const cart = user.cart || [];
+    cart.push(finalItem);
+
+    // Clear temp and go to protein loop or cart
+    await db.ref(`users/${from}`).update({
+        step: 'protein_loop',
+        cart: cart,
+        temp_swallow_item: null
+    });
+
+    twiml.message(`✅ Added ${tempItem.qty}x ${finalItem.name}.\n\n🍗 Do you want to add Protein/Sides?\n1. Yes\n2. No`);
+}
+
 async function handleProteinLoop(from, msg, twiml) {
   if (msg === '1') {
-    const cat = MENU_CATEGORIES['PROTEINS'];
+    const userSnap = await db.ref(`users/${from}`).once('value');
+    const user = userSnap.val();
+    const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
+    
+    // Fallback to a standard protein category if specific vendor doesn't have one defined
+    let proteinCat = vendor.categories["PROTEINS"] || vendor.categories["Proteins"] || vendor.categories["Protein"];
+    
+    if (!proteinCat) {
+        twiml.message("This vendor doesn't have specific protein addons. Going to checkout.");
+        return showCartSummary(from, userSnap.val().cart, twiml);
+    }
+
     let txt = `🍗 *Proteins & Sides*\n\n`;
-    cat.forEach(item => {
+    proteinCat.forEach(item => {
        const priceTxt = (item.reg === item.ext) ? formatCurrency(item.reg) : `${formatCurrency(item.reg)} / ${formatCurrency(item.ext)}`;
        txt += `${item.id}. ${item.name} - ${priceTxt}\n`;
     });
     txt += `\nReply item number.`;
     
-    await db.ref(`users/${from}/step`).set('protein_select');
-    twiml.message(txt);
+    // Set a flag that we are in a secondary protein selection to handle ID collisions properly if needed
+    // For simplicity, we just assume IDs are unique enough or we match by name.
+    // However, `handleProteinSelect` relies on `current_category`. 
+    // We need to trick it slightly or modify `handleProteinSelect`. 
+    // Simplest way: Set `current_category` to the key of the protein category.
+    
+    // Find the key for the proteins
+    const catKeys = Object.keys(vendor.categories);
+    const proteinKey = catKeys.find(k => k.toLowerCase().includes('protein'));
+    
+    if(proteinKey) {
+        await db.ref(`users/${from}`).update({
+            step: 'protein_select',
+            current_category: proteinKey
+        });
+        twiml.message(txt);
+    } else {
+        await showCartSummary(from, userSnap.val().cart, twiml);
+    }
+
   } else if (msg === '2') {
     const userSnap = await db.ref(`users/${from}`).once('value');
     await showCartSummary(from, userSnap.val().cart, twiml);
@@ -466,7 +1224,13 @@ async function handleProteinLoop(from, msg, twiml) {
 }
 
 async function handleProteinSelect(from, id, twiml) {
-  const cat = MENU_CATEGORIES['PROTEINS'];
+  const userSnap = await db.ref(`users/${from}`).once('value');
+  const user = userSnap.val();
+  const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
+  
+  const cat = vendor.categories[user.current_category];
+  if(!cat) return showCartSummary(from, user.cart, twiml); // Fallback if vendor has no proteins
+
   const item = cat.find(i => i.id === id);
   if (!item) return twiml.message("Invalid item.");
 
@@ -601,8 +1365,6 @@ async function handleErrandDetails(from, text, twiml) {
   twiml.message(msg);
 }
 
-// --- NEW PICKUP FLOW FUNCTIONS ---
-
 async function handlePickupDescription(from, text, twiml) {
     if (!text || text.trim().length === 0) return twiml.message("⚠️ Description cannot be empty.");
     await db.ref(`users/${from}`).update({
@@ -654,9 +1416,11 @@ async function handleCustomerPhone(from, text, twiml) {
 
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
+    const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
 
     if (user.order_type === 'food') {
-        twiml.message(`📍 *Where is the Pickup Location?*\n\n1. ${VENDOR_NAME} (Default)\n2. Type a different address\n\nReply 1 or 2.`);
+        const vendorName = vendor ? vendor.name : "Vendor";
+        twiml.message(`📍 *Where is the Pickup Location?*\n\n1. ${vendorName} (Default)\n2. Type a different address\n\nReply 1 or 2.`);
     } else {
         twiml.message("📍 *Where is the Pickup Location?*\n\n(e.g. Tarmac, School Road, Westend, Safari)");
     }
@@ -665,10 +1429,12 @@ async function handleCustomerPhone(from, text, twiml) {
 async function handlePickupLocation(from, text, twiml) {
     const userSnap = await db.ref(`users/${from}`).once('value');
     const user = userSnap.val();
+    const vendor = VENDORS.find(v => v.id === user.selected_vendor_id);
+    
     let location = text;
 
     if (user.order_type === 'food' && text.trim() === '1') {
-        location = VENDOR_ADDRESS;
+        location = vendor ? vendor.address : "Vendor Location";
     } else if (user.order_type === 'food' && text.trim() === '2') {
         await db.ref(`users/${from}/step`).set('pickup_location_manual');
         return twiml.message("📍 Please type the specific pickup address:");
